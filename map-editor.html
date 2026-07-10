@@ -182,6 +182,41 @@
     canvas.addEventListener('mouseup', handleCanvasUp);
     canvas.addEventListener('mouseleave', handleCanvasUp);
 
+    // === 模式切换 ===
+    function setMode(newMode) {
+      mode = newMode;
+      allBtns.forEach(b => b.classList.remove('active'));
+
+      const modeLabels = {
+        'wall':        '模式: 画墙 — 点击/拖拽画布放置墙体',
+        'erase':       '模式: 擦除 — 点击/拖拽画布清除墙体',
+        'place_hero':  '模式: 放置角色 — 点击空地放置角色',
+        'play':        '模式: 操控 — 方向键/WASD 移动角色'
+      };
+      const activeBtns = {
+        'wall': btnWall, 'erase': btnErase,
+        'place_hero': btnHero, 'play': btnPlay
+      };
+
+      activeBtns[newMode].classList.add('active');
+      statusEl.textContent = modeLabels[newMode];
+      render(); // 更新悬停/高亮
+    }
+
+    btnWall.addEventListener('click', () => setMode('wall'));
+    btnErase.addEventListener('click', () => setMode('erase'));
+    btnHero.addEventListener('click', () => setMode('place_hero'));
+    btnPlay.addEventListener('click', () => setMode('play'));
+
+    // 键盘快捷键
+    document.addEventListener('keydown', (e) => {
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+      if (e.key === '1') setMode('wall');
+      if (e.key === '2') setMode('erase');
+      if (e.key === '3') setMode('place_hero');
+      if (e.key === '4') setMode('play');
+    });
+
     // === 渲染 ===
     function drawEmptyTile(row, col) {
       const x = col * TILE_SIZE;
