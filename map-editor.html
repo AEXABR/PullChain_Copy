@@ -208,6 +208,28 @@
     btnHero.addEventListener('click', () => setMode('place_hero'));
     btnPlay.addEventListener('click', () => setMode('play'));
 
+    // === 导出 ===
+    function exportMap() {
+      const data = {
+        width: GRID_SIZE,
+        height: GRID_SIZE,
+        tiles: grid.map(row => [...row]),
+        heroStart: hero ? { row: hero.row, col: hero.col } : null
+      };
+
+      const json = JSON.stringify(data, null, 2);
+      const blob = new Blob([json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'map.json';
+      a.click();
+      URL.revokeObjectURL(url);
+      statusEl.textContent = '💾 地图已导出为 map.json';
+    }
+
+    btnExport.addEventListener('click', exportMap);
+
     // 键盘快捷键
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
