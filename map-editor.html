@@ -313,8 +313,8 @@
             grid[nr][nc] = 0;
             grid[cr][cc] = 2;
             hero = { row: nr, col: nc };
+          } else if (ball && ball.row === nr && ball.col === nc) {
           // 推球逻辑：如果目标格是球，尝试沿同方向推动
-          if (ball && ball.row === nr && ball.col === nc) {
             const br = nr + dir.dr;
             const bc = nc + dir.dc;
             // 球不能被推出界或推到墙上
