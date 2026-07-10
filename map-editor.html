@@ -365,17 +365,31 @@
                   grid[ball.row] && grid[ball.row][diagCol] === T_EMPTY
                 );
                 if (diagOk) {
-                  candidates.push({ row: diagRow, col: diagCol });
+                  candidates.push({ row: diagRow, col: diagCol, pushDr: dr, pushDc: dc });
                 }
                 if (dr !== 0 && dc !== 0) {
-                  candidates.push({ row: diagRow, col: ball.col });
-                  candidates.push({ row: ball.row, col: diagCol });
+                  candidates.push({ row: diagRow, col: ball.col, pushDr: dr, pushDc: 0 });
+                  candidates.push({ row: ball.row, col: diagCol, pushDr: 0,  pushDc: dc });
                 }
                 for (const c of candidates) {
-                  if (c.row >= 0 && c.row < GRID_SIZE && c.col >= 0 && c.col < GRID_SIZE &&
-                      grid[c.row][c.col] === T_EMPTY) {
+                  if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
+                  const cell = grid[c.row][c.col];
+                  if (cell === T_EMPTY) {
                     ball = c;
                     break;
+                  } else if (isCrate(cell)) {
+                    // 球推动箱子：箱子沿球的位移方向移动
+                    const pr = c.row + c.pushDr;
+                    const pc = c.col + c.pushDc;
+                    if (pr >= 0 && pr < GRID_SIZE && pc >= 0 && pc < GRID_SIZE &&
+                        grid[pr][pc] === T_EMPTY &&
+                        !(hero.row === pr && hero.col === pc)) {
+                      grid[c.row][c.col] = T_EMPTY;
+                      grid[pr][pc] = cell; // 保留箱子类型
+                      ball = c;
+                      break;
+                    }
+                    // 推不动则继续试下一个候选
                   }
                 }
               }
