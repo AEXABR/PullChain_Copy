@@ -319,11 +319,20 @@
                 const dr = Math.sign(tr - ball.row); // -1, 0, 1
                 const dc = Math.sign(tc - ball.col);
                 // 候选移动：优先对角线，被墙挡则降级为单轴
+                // 对角线需检查两个拐角格，防止穿墙
                 const candidates = [];
-                candidates.push({ row: ball.row + dr, col: ball.col + dc });
+                const diagRow = ball.row + dr;
+                const diagCol = ball.col + dc;
+                const diagOk = dr === 0 || dc === 0 || (
+                  grid[diagRow] && grid[diagRow][ball.col] !== 1 &&
+                  grid[ball.row] && grid[ball.row][diagCol] !== 1
+                );
+                if (diagOk) {
+                  candidates.push({ row: diagRow, col: diagCol });
+                }
                 if (dr !== 0 && dc !== 0) {
-                  candidates.push({ row: ball.row + dr, col: ball.col });      // 只Y轴
-                  candidates.push({ row: ball.row,      col: ball.col + dc }); // 只X轴
+                  candidates.push({ row: diagRow, col: ball.col });      // 只Y轴
+                  candidates.push({ row: ball.row, col: diagCol }); // 只X轴
                 }
                 for (const c of candidates) {
                   if (c.row >= 0 && c.row < GRID_SIZE && c.col >= 0 && c.col < GRID_SIZE &&
