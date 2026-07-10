@@ -327,6 +327,64 @@
 
     btnClear.addEventListener('click', clearMap);
 
+    // 绳子跟随：主角移动后球尝试跟上，返回false则主角需撤销移动
+    function followBall(prevRow, prevCol) {
+      if (!ball) return true;
+      const dist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
+      if (dist <= 1) return true;
+
+      const prevBall = { row: ball.row, col: ball.col };
+      const dr = Math.sign(prevRow - ball.row);
+      const dc = Math.sign(prevCol - ball.col);
+      const candidates = [];
+      const diagRow = ball.row + dr;
+      const diagCol = ball.col + dc;
+
+      let diagOk = dr === 0 || dc === 0;
+      if (!diagOk) {
+        const c1r = diagRow, c1c = ball.col;
+        const c2r = ball.row, c2c = diagCol;
+        const c1clear = grid[c1r] && (grid[c1r][c1c] === T_EMPTY ||
+          (isCrate(grid[c1r][c1c]) && tryPushCrate(grid[c1r][c1c], c1r, c1c, dr, dc)));
+        const c2clear = grid[c2r] && (grid[c2r][c2c] === T_EMPTY ||
+          (isCrate(grid[c2r][c2c]) && tryPushCrate(grid[c2r][c2c], c2r, c2c, dr, dc)));
+        diagOk = c1clear && c2clear;
+      }
+      if (diagOk) candidates.push({ row: diagRow, col: diagCol, pushDr: dr, pushDc: dc });
+      if (dr !== 0 && dc !== 0) {
+        candidates.push({ row: diagRow, col: ball.col, pushDr: dr, pushDc: 0 });
+        candidates.push({ row: ball.row, col: diagCol, pushDr: 0,  pushDc: dc });
+      }
+
+      let ballMoved = false;
+      for (const c of candidates) {
+        if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
+        const cell = grid[c.row][c.col];
+        if (!isCrate(cell)) continue;
+        if (tryPushCrate(cell, c.row, c.col, c.pushDr, c.pushDc)) {
+          ball = { row: c.row, col: c.col };
+          ballMoved = true;
+          break;
+        }
+      }
+      if (!ballMoved) {
+        for (const c of candidates) {
+          if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
+          if (grid[c.row][c.col] === T_EMPTY) {
+            ball = c;
+            break;
+          }
+        }
+      }
+
+      const finalDist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
+      if (finalDist > 1) {
+        ball = prevBall;
+        return false;
+      }
+      return true;
+    }
+
     // 键盘快捷键
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -356,7 +414,7 @@
           // 墙体检查
           if (grid[nr][nc] === T_WALL) return;
 
-          // 推箱子：保留箱子类型，沿同方向推动
+          // 推箱子
           if (isCrate(grid[nr][nc])) {
             const crateType = grid[nr][nc];
             const cr = nr + dir.dr;
@@ -367,81 +425,27 @@
             grid[nr][nc] = T_EMPTY;
             grid[cr][cc] = crateType;
             hero = { row: nr, col: nc };
+            // 推完箱子也要绳子跟随
+            if (!followBall(row, col)) {
+              grid[cr][cc] = T_EMPTY;
+              grid[nr][nc] = crateType;
+              hero = { row, col };
+              return;
+            }
+          // 推球
           } else if (ball && ball.row === nr && ball.col === nc) {
-            // 推球逻辑：球不能被推到墙或箱子上
             const br = nr + dir.dr;
             const bc = nc + dir.dc;
             if (br < 0 || br >= GRID_SIZE || bc < 0 || bc >= GRID_SIZE) return;
             if (isSolid(grid[br][bc])) return;
             ball = { row: br, col: bc };
             hero = { row: nr, col: nc };
+          // 普通移动 + 绳子跟随
           } else {
-            // 没撞到球：先暂存状态，如果球跟完主角脱离8邻格则撤销
-            const prevHero = { row, col };
-            const prevBall = ball ? { row: ball.row, col: ball.col } : null;
             hero = { row: nr, col: nc };
-
-            if (ball) {
-              const dist = Math.max(Math.abs(nr - ball.row), Math.abs(nc - ball.col));
-              if (dist > 1) {
-                const tr = row;
-                const tc = col;
-                const dr = Math.sign(tr - ball.row);
-                const dc = Math.sign(tc - ball.col);
-                const candidates = [];
-                const diagRow = ball.row + dr;
-                const diagCol = ball.col + dc;
-                // 对角拐角检查：空格或可推开的箱子都算通
-                let diagOk = dr === 0 || dc === 0;
-                if (!diagOk) {
-                  const c1r = diagRow, c1c = ball.col; // 拐角1
-                  const c2r = ball.row, c2c = diagCol; // 拐角2
-                  const c1clear = grid[c1r] && (grid[c1r][c1c] === T_EMPTY ||
-                    (isCrate(grid[c1r][c1c]) && tryPushCrate(grid[c1r][c1c], c1r, c1c, dr, dc)));
-                  const c2clear = grid[c2r] && (grid[c2r][c2c] === T_EMPTY ||
-                    (isCrate(grid[c2r][c2c]) && tryPushCrate(grid[c2r][c2c], c2r, c2c, dr, dc)));
-                  diagOk = c1clear && c2clear;
-                }
-                if (diagOk) {
-                  candidates.push({ row: diagRow, col: diagCol, pushDr: dr, pushDc: dc });
-                }
-                if (dr !== 0 && dc !== 0) {
-                  candidates.push({ row: diagRow, col: ball.col, pushDr: dr, pushDc: 0 });
-                  candidates.push({ row: ball.row, col: diagCol, pushDr: 0,  pushDc: dc });
-                }
-                // 两趟遍历：优先推箱子（球位移不消失），推不动再走空格
-                let ballMoved = false;
-                for (const c of candidates) {
-                  if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
-                  const cell = grid[c.row][c.col];
-                  if (!isCrate(cell)) continue;
-                  // 尝试推箱子，推不动则降级单轴推同一箱子
-                  if (tryPushCrate(cell, c.row, c.col, c.pushDr, c.pushDc)) {
-                    ball = { row: c.row, col: c.col };
-                    ballMoved = true;
-                    break;
-                  }
-                }
-                if (!ballMoved) {
-                  for (const c of candidates) {
-                    if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
-                    if (grid[c.row][c.col] === T_EMPTY) {
-                      ball = c;
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-
-            // 球跟完后主角仍脱离8邻格 → 撤销移动
-            if (ball) {
-              const finalDist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
-              if (finalDist > 1) {
-                hero = prevHero;
-                ball = prevBall;
-                return;
-              }
+            if (!followBall(row, col)) {
+              hero = { row, col };
+              return;
             }
           }
 
