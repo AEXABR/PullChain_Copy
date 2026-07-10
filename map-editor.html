@@ -309,11 +309,29 @@
           } else {
             // 没撞到球，正常移动
             hero = { row: nr, col: nc };
-            // 绳子逻辑：移动后主角在球的8邻格之外 → 球被拉到主角移动前的位置
+            // 绳子逻辑：移动后主角在球的8邻格之外 → 球尝试向主角原位置靠近一步
+            // 球与主角斜角时，位移有X和Y分量，各轴独立检查墙体
             if (ball) {
               const dist = Math.max(Math.abs(nr - ball.row), Math.abs(nc - ball.col));
               if (dist > 1) {
-                ball = { row, col };
+                const tr = row; // 目标：主角移动前的位置
+                const tc = col;
+                const dr = Math.sign(tr - ball.row); // -1, 0, 1
+                const dc = Math.sign(tc - ball.col);
+                // 候选移动：优先对角线，被墙挡则降级为单轴
+                const candidates = [];
+                candidates.push({ row: ball.row + dr, col: ball.col + dc });
+                if (dr !== 0 && dc !== 0) {
+                  candidates.push({ row: ball.row + dr, col: ball.col });      // 只Y轴
+                  candidates.push({ row: ball.row,      col: ball.col + dc }); // 只X轴
+                }
+                for (const c of candidates) {
+                  if (c.row >= 0 && c.row < GRID_SIZE && c.col >= 0 && c.col < GRID_SIZE &&
+                      grid[c.row][c.col] !== 1) {
+                    ball = c;
+                    break;
+                  }
+                }
               }
             }
           }
