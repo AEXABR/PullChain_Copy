@@ -7,16 +7,11 @@
 <style>
   :root {
     --bg: #1a1a2e;
-    --surface: #16213e;
     --text: #e0e0e0;
     --accent: #e94560;
     --btn-bg: #0f3460;
     --btn-active: #e94560;
     --canvas-bg: #2a2a3e;
-    --wall-color: #555566;
-    --wall-line: #777788;
-    --empty-color: #3a3a4e;
-    --grid-line: #4a4a5e;
   }
   * { margin: 0; padding: 0; box-sizing: border-box; }
   body {
@@ -124,8 +119,6 @@
     }
     initGrid();
 
-    console.log('Map Editor initialized:', { grid, mode, hero, TILE_SIZE });
-
     // === 事件处理 ===
     function getCellFromEvent(e) {
       const rect = canvas.getBoundingClientRect();
@@ -140,6 +133,10 @@
     }
 
     function setTile(row, col, value) {
+      if (value === 1 && hero && hero.row === row && hero.col === col) {
+        hero = null;
+        statusEl.textContent = '⚠ 角色被墙体覆盖，已移除角色';
+      }
       if (grid[row][col] === value) return; // 不变不重绘
       grid[row][col] = value;
       render();
@@ -186,10 +183,15 @@
     canvas.addEventListener('mousedown', handleCanvasDown);
     canvas.addEventListener('mousemove', handleCanvasMove);
     canvas.addEventListener('mouseup', handleCanvasUp);
-    canvas.addEventListener('mouseleave', handleCanvasUp);
+    canvas.addEventListener('mouseleave', () => {
+      handleCanvasUp();
+      hoverCell = null;
+      render();
+    });
 
     // === 模式切换 ===
     function setMode(newMode) {
+      isDrawing = false;
       mode = newMode;
       allBtns.forEach(b => b.classList.remove('active'));
 
