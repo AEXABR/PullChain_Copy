@@ -115,6 +115,37 @@
       return null;
     }
 
+    // 尝试推箱子：优先全方向推，被挡降级单轴推同一箱子。返回是否成功
+    function tryPushCrate(crateType, cr, cc, pushDr, pushDc) {
+      const pr = cr + pushDr;
+      const pc = cc + pushDc;
+      // 全方向
+      if (pr >= 0 && pr < GRID_SIZE && pc >= 0 && pc < GRID_SIZE &&
+          grid[pr][pc] === T_EMPTY && !(hero.row === pr && hero.col === pc)) {
+        grid[cr][cc] = T_EMPTY;
+        grid[pr][pc] = crateType;
+        return true;
+      }
+      // 对角被挡 → 降级单轴推同一箱子
+      if (pushDr !== 0 && pushDc !== 0) {
+        const prY = cr + pushDr;
+        const pcX = cc + pushDc;
+        if (prY >= 0 && prY < GRID_SIZE && grid[prY][cc] === T_EMPTY &&
+            !(hero.row === prY && hero.col === cc)) {
+          grid[cr][cc] = T_EMPTY;
+          grid[prY][cc] = crateType;
+          return true;
+        }
+        if (pcX >= 0 && pcX < GRID_SIZE && grid[cr][pcX] === T_EMPTY &&
+            !(hero.row === cr && hero.col === pcX)) {
+          grid[cr][cc] = T_EMPTY;
+          grid[cr][pcX] = crateType;
+          return true;
+        }
+      }
+      return false;
+    }
+
     // === DOM 引用 ===
     const canvas = document.getElementById('map');
     const ctx = canvas.getContext('2d');
@@ -371,44 +402,26 @@
                   candidates.push({ row: diagRow, col: ball.col, pushDr: dr, pushDc: 0 });
                   candidates.push({ row: ball.row, col: diagCol, pushDr: 0,  pushDc: dc });
                 }
+                // 两趟遍历：优先推箱子（球位移不消失），推不动再走空格
+                let ballMoved = false;
                 for (const c of candidates) {
                   if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
                   const cell = grid[c.row][c.col];
-                  if (cell === T_EMPTY) {
-                    ball = c;
+                  if (!isCrate(cell)) continue;
+                  // 尝试推箱子，推不动则降级单轴推同一箱子
+                  if (tryPushCrate(cell, c.row, c.col, c.pushDr, c.pushDc)) {
+                    ball = { row: c.row, col: c.col };
+                    ballMoved = true;
                     break;
-                  } else if (isCrate(cell)) {
-                    // 球推动箱子：优先全方向推，被挡则降级单轴推（同箱子不换格）
-                    let pushed = false;
-                    const pr = c.row + c.pushDr;
-                    const pc = c.col + c.pushDc;
-                    if (pr >= 0 && pr < GRID_SIZE && pc >= 0 && pc < GRID_SIZE &&
-                        grid[pr][pc] === T_EMPTY &&
-                        !(hero.row === pr && hero.col === pc)) {
-                      grid[c.row][c.col] = T_EMPTY;
-                      grid[pr][pc] = cell;
+                  }
+                }
+                if (!ballMoved) {
+                  for (const c of candidates) {
+                    if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
+                    if (grid[c.row][c.col] === T_EMPTY) {
                       ball = c;
-                      pushed = true;
-                    } else if (c.pushDr !== 0 && c.pushDc !== 0) {
-                      // 对角推不动 → 降级为单轴推同一个箱子
-                      const prY = c.row + c.pushDr;
-                      const pcX = c.col + c.pushDc;
-                      if (prY >= 0 && prY < GRID_SIZE && grid[prY][c.col] === T_EMPTY &&
-                          !(hero.row === prY && hero.col === c.col)) {
-                        grid[c.row][c.col] = T_EMPTY;
-                        grid[prY][c.col] = cell;
-                        ball = c;
-                        pushed = true;
-                      } else if (pcX >= 0 && pcX < GRID_SIZE && grid[c.row][pcX] === T_EMPTY &&
-                                 !(hero.row === c.row && hero.col === pcX)) {
-                        grid[c.row][c.col] = T_EMPTY;
-                        grid[c.row][pcX] = cell;
-                        ball = c;
-                        pushed = true;
-                      }
+                      break;
                     }
-                    if (pushed) break;
-                    // 推不动则继续试下一个候选
                   }
                 }
               }
