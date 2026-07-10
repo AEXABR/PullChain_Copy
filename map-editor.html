@@ -342,7 +342,7 @@
         const c1clear = grid[c1r] && (grid[c1r][c1c] === T_EMPTY ||
           (isCrate(grid[c1r][c1c]) && tryPushCrate(grid[c1r][c1c], c1r, c1c, dr, dc)));
         const c2clear = grid[c2r] && (grid[c2r][c2c] === T_EMPTY ||
-          (isCrate(grid[c2r][c2c]) && tryPushCrate(grid[c2r][c2c], c2r, c2c, dr, dc)));
+          (isCrate(grid[c2r][c2c]) && tryPushCrate(grid[c2r][c2c], c2r, c2c, 0, dc)));
         diagOk = c1clear && c2clear;
       }
       if (diagOk) candidates.push({ row: diagRow, col: diagCol, pushDr: dr, pushDc: dc });
@@ -354,6 +354,8 @@
       let ballMoved = false;
       for (const c of candidates) {
         if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
+        const d = Math.max(Math.abs(hero.row - c.row), Math.abs(hero.col - c.col));
+        if (d > 1) continue;
         const cell = grid[c.row][c.col];
         if (!isCrate(cell)) continue;
         if (tryPushCrate(cell, c.row, c.col, c.pushDr, c.pushDc)) {
@@ -365,10 +367,12 @@
       if (!ballMoved) {
         for (const c of candidates) {
           if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
-          if (grid[c.row][c.col] === T_EMPTY) {
-            ball = c;
-            break;
-          }
+          if (grid[c.row][c.col] !== T_EMPTY) continue;
+          const d = Math.max(Math.abs(hero.row - c.row), Math.abs(hero.col - c.col));
+          if (d > 1) continue;
+          ball = c;
+          ballMoved = true;
+          break;
         }
       }
 
