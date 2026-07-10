@@ -295,21 +295,32 @@
           if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return;
           // 墙体检查
           if (grid[nr][nc] === 1) return;
-          // 球位置检查（不能走到球上）
-          if (ball && ball.row === nr && ball.col === nc) return;
 
-          // 绳子逻辑：如果移动后主角在球的8邻格之外，球被拉到主角移动前的位置
-          if (ball) {
-            const dist = Math.max(Math.abs(nr - ball.row), Math.abs(nc - ball.col));
-            if (dist > 1) {
-              ball = { row, col };
+          // 推球逻辑：如果目标格是球，尝试沿同方向推动
+          if (ball && ball.row === nr && ball.col === nc) {
+            const br = nr + dir.dr;
+            const bc = nc + dir.dc;
+            // 球不能被推出界或推到墙上
+            if (br < 0 || br >= GRID_SIZE || bc < 0 || bc >= GRID_SIZE) return;
+            if (grid[br][bc] === 1) return;
+            // 推动成功
+            ball = { row: br, col: bc };
+            hero = { row: nr, col: nc };
+          } else {
+            // 没撞到球，正常移动
+            hero = { row: nr, col: nc };
+            // 绳子逻辑：移动后主角在球的8邻格之外 → 球被拉到主角移动前的位置
+            if (ball) {
+              const dist = Math.max(Math.abs(nr - ball.row), Math.abs(nc - ball.col));
+              if (dist > 1) {
+                ball = { row, col };
+              }
             }
           }
 
-          hero = { row: nr, col: nc };
-          statusEl.textContent = `角色位置: (${nr}, ${nc})` +
+          statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +
             (ball ? `  球位置: (${ball.row}, ${ball.col})` : '') +
-            (ball ? `  距离: ${Math.max(Math.abs(nr - ball.row), Math.abs(nc - ball.col))}` : '');
+            (ball ? `  距离: ${Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col))}` : '');
           render();
         }
       }
