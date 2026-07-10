@@ -378,17 +378,36 @@
                     ball = c;
                     break;
                   } else if (isCrate(cell)) {
-                    // 球推动箱子：箱子沿球的位移方向移动
+                    // 球推动箱子：优先全方向推，被挡则降级单轴推（同箱子不换格）
+                    let pushed = false;
                     const pr = c.row + c.pushDr;
                     const pc = c.col + c.pushDc;
                     if (pr >= 0 && pr < GRID_SIZE && pc >= 0 && pc < GRID_SIZE &&
                         grid[pr][pc] === T_EMPTY &&
                         !(hero.row === pr && hero.col === pc)) {
                       grid[c.row][c.col] = T_EMPTY;
-                      grid[pr][pc] = cell; // 保留箱子类型
+                      grid[pr][pc] = cell;
                       ball = c;
-                      break;
+                      pushed = true;
+                    } else if (c.pushDr !== 0 && c.pushDc !== 0) {
+                      // 对角推不动 → 降级为单轴推同一个箱子
+                      const prY = c.row + c.pushDr;
+                      const pcX = c.col + c.pushDc;
+                      if (prY >= 0 && prY < GRID_SIZE && grid[prY][c.col] === T_EMPTY &&
+                          !(hero.row === prY && hero.col === c.col)) {
+                        grid[c.row][c.col] = T_EMPTY;
+                        grid[prY][c.col] = cell;
+                        ball = c;
+                        pushed = true;
+                      } else if (pcX >= 0 && pcX < GRID_SIZE && grid[c.row][pcX] === T_EMPTY &&
+                                 !(hero.row === c.row && hero.col === pcX)) {
+                        grid[c.row][c.col] = T_EMPTY;
+                        grid[c.row][pcX] = cell;
+                        ball = c;
+                        pushed = true;
+                      }
                     }
+                    if (pushed) break;
                     // 推不动则继续试下一个候选
                   }
                 }
