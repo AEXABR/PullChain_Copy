@@ -93,6 +93,28 @@
     const GRID_SIZE = 16;
     const TILE_SIZE = CANVAS_SIZE / GRID_SIZE; // 32px
 
+    // 地块类型
+    const T_EMPTY = 0;
+    const T_WALL  = 1;
+
+    // === 箱子注册表（扩展新箱子只需在这里加一项） ===
+    const CRATES = {
+      wood: { id: 2, name: '木箱', emoji: '📦', pushable: true },
+      // 未来变种示例:
+      // iron:  { id: 3, name: '铁箱', emoji: '🔩', pushable: false },
+      // bomb:  { id: 4, name: '炸弹', emoji: '💣', pushable: true },
+    };
+
+    // 工具函数
+    function isSolid(v)  { return v !== T_EMPTY; }
+    function isCrate(v)  { return v >= 2; }
+    function crateById(id) {
+      for (const key of Object.keys(CRATES)) {
+        if (CRATES[key].id === id) return CRATES[key];
+      }
+      return null;
+    }
+
     // === DOM 引用 ===
     const canvas = document.getElementById('map');
     const ctx = canvas.getContext('2d');
@@ -109,7 +131,7 @@
 
     // === 状态 ===
     let mode = 'wall';          // 'wall' | 'erase' | 'place_hero' | 'place_ball' | 'play'
-    let grid = [];              // grid[row][col]: 0=空地, 1=墙体
+    let grid = [];              // grid[row][col]: 0=空地, 1=墙体, >=2=箱子(见CRATES)
     let hero = null;            // {row, col} | null
     let ball = null;            // {row, col} | null
     let isDrawing = false;      // 鼠标拖拽中
@@ -119,7 +141,7 @@
     function initGrid() {
       grid = [];
       for (let r = 0; r < GRID_SIZE; r++) {
-        grid[r] = new Array(GRID_SIZE).fill(0);
+        grid[r] = new Array(GRID_SIZE).fill(T_EMPTY);
       }
     }
     initGrid();
@@ -138,7 +160,7 @@
     }
 
     function setTile(row, col, value) {
-      if (value === 1) {
+      if (value === T_WALL) {
         if (hero && hero.row === row && hero.col === col) {
           hero = null;
           statusEl.textContent = '⚠ 角色被墙体覆盖，已移除角色';
@@ -263,7 +285,7 @@
       if (!confirm('确定要清空整个地图吗？此操作不可撤销。')) return;
       for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
-          grid[r][c] = 0;
+          grid[r][c] = T_EMPTY;
         }
       }
       hero = null;
@@ -301,25 +323,25 @@
           // 边界检查
           if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return;
           // 墙体检查
-          if (grid[nr][nc] === 1) return;
+          if (grid[nr][nc] === T_WALL) return;
 
-          // 推箱子：目标格是箱子，尝试沿同方向推动
-          if (grid[nr][nc] === 2) {
+          // 推箱子：保留箱子类型，沿同方向推动
+          if (isCrate(grid[nr][nc])) {
+            const crateType = grid[nr][nc];
             const cr = nr + dir.dr;
             const cc = nc + dir.dc;
             if (cr < 0 || cr >= GRID_SIZE || cc < 0 || cc >= GRID_SIZE) return;
-            if (grid[cr][cc] !== 0) return; // 箱子只能推到空地
+            if (isSolid(grid[cr][cc])) return;
             if (ball && ball.row === cr && ball.col === cc) return;
-            grid[nr][nc] = 0;
-            grid[cr][cc] = 2;
+            grid[nr][nc] = T_EMPTY;
+            grid[cr][cc] = crateType;
             hero = { row: nr, col: nc };
           } else if (ball && ball.row === nr && ball.col === nc) {
-          // 推球逻辑：如果目标格是球，尝试沿同方向推动
+            // 推球逻辑：球不能被推到墙或箱子上
             const br = nr + dir.dr;
             const bc = nc + dir.dc;
-            // 球不能被推出界或推到墙上
             if (br < 0 || br >= GRID_SIZE || bc < 0 || bc >= GRID_SIZE) return;
-            if (grid[br][bc] !== 0) return; // 球不能被推到墙或箱子上
+            if (isSolid(grid[br][bc])) return;
             ball = { row: br, col: bc };
             hero = { row: nr, col: nc };
           } else {
@@ -339,8 +361,8 @@
                 const diagRow = ball.row + dr;
                 const diagCol = ball.col + dc;
                 const diagOk = dr === 0 || dc === 0 || (
-                  grid[diagRow] && grid[diagRow][ball.col] === 0 &&
-                  grid[ball.row] && grid[ball.row][diagCol] === 0
+                  grid[diagRow] && grid[diagRow][ball.col] === T_EMPTY &&
+                  grid[ball.row] && grid[ball.row][diagCol] === T_EMPTY
                 );
                 if (diagOk) {
                   candidates.push({ row: diagRow, col: diagCol });
@@ -351,7 +373,7 @@
                 }
                 for (const c of candidates) {
                   if (c.row >= 0 && c.row < GRID_SIZE && c.col >= 0 && c.col < GRID_SIZE &&
-                      grid[c.row][c.col] === 0) {
+                      grid[c.row][c.col] === T_EMPTY) {
                     ball = c;
                     break;
                   }
@@ -408,7 +430,7 @@
     }
 
     function placeHero(row, col) {
-      if (grid[row][col] !== 0) {
+      if (isSolid(grid[row][col])) {
         statusEl.textContent = '⚠ 不能把角色放在墙体或箱子上！';
         return;
       }
@@ -459,7 +481,7 @@
     }
 
     function placeBall(row, col) {
-      if (grid[row][col] !== 0) {
+      if (isSolid(grid[row][col])) {
         statusEl.textContent = '⚠ 不能把球放在墙体或箱子上！';
         return;
       }
@@ -474,8 +496,9 @@
     }
 
     // === 箱子 ===
-    function drawCrateTile(row, col) {
+    function drawCrateTile(row, col, crateId) {
       const x = col * TILE_SIZE;
+      const type = crateById(crateId) || CRATES.wood;
       const y = row * TILE_SIZE;
       // 木箱底色
       ctx.fillStyle = '#8B6914';
@@ -509,8 +532,8 @@
       ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
     }
 
-    function placeCrate(row, col) {
-      if (grid[row][col] !== 0) {
+    function placeCrate(row, col, crateKey) {
+      if (isSolid(grid[row][col])) {
         statusEl.textContent = '⚠ 此处已被占用！';
         return;
       }
@@ -522,8 +545,9 @@
         statusEl.textContent = '⚠ 球在此处！';
         return;
       }
-      grid[row][col] = 2;
-      statusEl.textContent = '📦 箱子已放置';
+      const type = CRATES[crateKey || 'wood'];
+      grid[row][col] = type.id;
+      statusEl.textContent = `${type.emoji} ${type.name}已放置`;
       render();
     }
 
@@ -628,10 +652,10 @@
       // 1. 绘制所有格子
       for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
-          if (grid[r][c] === 1) {
+          if (grid[r][c] === T_WALL) {
             drawWallTile(r, c);
-          } else if (grid[r][c] === 2) {
-            drawCrateTile(r, c);
+          } else if (isCrate(grid[r][c])) {
+            drawCrateTile(r, c, grid[r][c]);
           } else {
             drawEmptyTile(r, c);
           }
@@ -646,7 +670,7 @@
         const { row, col } = hoverCell;
         const x = col * TILE_SIZE;
         const y = row * TILE_SIZE;
-        const blocked = grid[row][col] !== 0 ||
+        const blocked = isSolid(grid[row][col]) ||
           (mode === 'place_hero' && ball && ball.row === row && ball.col === col) ||
           (mode === 'place_ball' && hero && hero.row === row && hero.col === col);
         if (blocked) {
