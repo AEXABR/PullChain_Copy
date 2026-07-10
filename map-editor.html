@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>像素地图编辑器</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --text: #e0e0e0;
+    --accent: #e94560;
+    --btn-bg: #0f3460;
+    --btn-active: #e94560;
+    --canvas-bg: #2a2a3e;
+    --wall-color: #555566;
+    --wall-line: #777788;
+    --empty-color: #3a3a4e;
+    --grid-line: #4a4a5e;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Courier New', monospace;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+  h1 {
+    font-size: 24px;
+    letter-spacing: 4px;
+    margin-bottom: 16px;
+    image-rendering: pixelated;
+    text-transform: uppercase;
+  }
+  #toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  #toolbar button {
+    background: var(--btn-bg);
+    color: var(--text);
+    border: 2px solid #4a4a6e;
+    padding: 8px 16px;
+    font-family: 'Courier New', monospace;
+    font-size: 14px;
+    cursor: pointer;
+    image-rendering: pixelated;
+    transition: background 0.1s;
+  }
+  #toolbar button:hover { border-color: var(--accent); }
+  #toolbar button.active {
+    background: var(--btn-active);
+    border-color: var(--btn-active);
+  }
+  #status {
+    font-size: 13px;
+    margin-bottom: 10px;
+    color: #aaa;
+    min-height: 20px;
+  }
+  canvas {
+    border: 2px solid #4a4a6e;
+    image-rendering: pixelated;
+    cursor: crosshair;
+    background: var(--canvas-bg);
+  }
+</style>
+</head>
+<body>
+  <h1>Map Editor</h1>
+  <div id="toolbar">
+    <button id="btn-wall" class="active">🖼 画墙 [1]</button>
+    <button id="btn-erase">🗑 擦除 [2]</button>
+    <button id="btn-hero">🧍 放角色 [3]</button>
+    <button id="btn-play">▶ 操控 [4]</button>
+    <button id="btn-export">💾 导出</button>
+  </div>
+  <div id="status">模式: 画墙 — 点击/拖拽画布放置墙体</div>
+  <canvas id="map" width="512" height="512"></canvas>
+
+  <script>
+    // === 常量 ===
+    const CANVAS_SIZE = 512;
+    const GRID_SIZE = 16;
+    const TILE_SIZE = CANVAS_SIZE / GRID_SIZE; // 32px
+
+    // === DOM 引用 ===
+    const canvas = document.getElementById('map');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+    const btnWall = document.getElementById('btn-wall');
+    const btnErase = document.getElementById('btn-erase');
+    const btnHero = document.getElementById('btn-hero');
+    const btnPlay = document.getElementById('btn-play');
+    const btnExport = document.getElementById('btn-export');
+    const allBtns = [btnWall, btnErase, btnHero, btnPlay];
+
+    // === 状态 ===
+    let mode = 'wall';          // 'wall' | 'erase' | 'place_hero' | 'play'
+    let grid = [];              // grid[row][col]: 0=空地, 1=墙体
+    let hero = null;            // {row, col} | null
+    let isDrawing = false;      // 鼠标拖拽中
+    let hoverCell = null;       // {row, col} | null  鼠标悬停格子
+
+    // === 状态初始化 ===
+    function initGrid() {
+      grid = [];
+      for (let r = 0; r < GRID_SIZE; r++) {
+        grid[r] = new Array(GRID_SIZE).fill(0);
+      }
+    }
+    initGrid();
+
+    console.log('Map Editor initialized:', { grid, mode, hero, TILE_SIZE });
+  </script>
+</body>
+</html>
