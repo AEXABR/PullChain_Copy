@@ -70,6 +70,10 @@
     image-rendering: pixelated;
     cursor: crosshair;
     background: var(--canvas-bg);
+    box-shadow: 0 0 20px rgba(233, 69, 96, 0.15);
+  }
+  #toolbar button:active {
+    transform: translateY(1px);
   }
 </style>
 </head>
@@ -80,6 +84,7 @@
     <button id="btn-erase">🗑 擦除 [2]</button>
     <button id="btn-hero">🧍 放角色 [3]</button>
     <button id="btn-play">▶ 操控 [4]</button>
+    <button id="btn-clear">🗺 清空</button>
     <button id="btn-export">💾 导出</button>
   </div>
   <div id="status">模式: 画墙 — 点击/拖拽画布放置墙体</div>
@@ -100,6 +105,7 @@
     const btnHero = document.getElementById('btn-hero');
     const btnPlay = document.getElementById('btn-play');
     const btnExport = document.getElementById('btn-export');
+    const btnClear = document.getElementById('btn-clear');
     const allBtns = [btnWall, btnErase, btnHero, btnPlay];
 
     // === 状态 ===
@@ -230,6 +236,21 @@
 
     btnExport.addEventListener('click', exportMap);
 
+    // === 清空地图 ===
+    function clearMap() {
+      if (!confirm('确定要清空整个地图吗？此操作不可撤销。')) return;
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          grid[r][c] = 0;
+        }
+      }
+      hero = null;
+      statusEl.textContent = '🗺 地图已清空';
+      render();
+    }
+
+    btnClear.addEventListener('click', clearMap);
+
     // 键盘快捷键
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -342,6 +363,13 @@
       // 边框
       ctx.strokeStyle = '#444455';
       ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+      // 微妙高光（左上角亮边）
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.beginPath();
+      ctx.moveTo(x, y + TILE_SIZE);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x + TILE_SIZE, y);
+      ctx.stroke();
     }
 
     function drawGridLines() {
