@@ -79,6 +79,7 @@
     <button id="btn-erase">🗑 擦除 [2]</button>
     <button id="btn-hero">🧍 放角色 [3]</button>
     <button id="btn-ball">🟡 放球 [5]</button>
+    <button id="btn-crate">📦 放箱子 [6]</button>
     <button id="btn-play">▶ 操控 [4]</button>
     <button id="btn-clear">🗺 清空</button>
     <button id="btn-export">💾 导出</button>
@@ -100,10 +101,11 @@
     const btnErase = document.getElementById('btn-erase');
     const btnHero = document.getElementById('btn-hero');
     const btnBall = document.getElementById('btn-ball');
+    const btnCrate = document.getElementById('btn-crate');
     const btnPlay = document.getElementById('btn-play');
     const btnExport = document.getElementById('btn-export');
     const btnClear = document.getElementById('btn-clear');
-    const allBtns = [btnWall, btnErase, btnHero, btnBall, btnPlay];
+    const allBtns = [btnWall, btnErase, btnHero, btnBall, btnCrate, btnPlay];
 
     // === 状态 ===
     let mode = 'wall';          // 'wall' | 'erase' | 'place_hero' | 'place_ball' | 'play'
@@ -165,6 +167,8 @@
         placeHero(cell.row, cell.col);
       } else if (mode === 'place_ball') {
         placeBall(cell.row, cell.col);
+      } else if (mode === 'place_crate') {
+        placeCrate(cell.row, cell.col);
       }
     }
 
@@ -172,7 +176,7 @@
       const cell = getCellFromEvent(e);
       hoverCell = cell;
 
-      if (mode === 'place_hero' || mode === 'place_ball') {
+      if (mode === 'place_hero' || mode === 'place_ball' || mode === 'place_crate') {
         render();
         return;
       }
@@ -208,14 +212,15 @@
 
       const modeLabels = {
         'wall':        '模式: 画墙 — 点击/拖拽画布放置墙体',
-        'erase':       '模式: 擦除 — 点击/拖拽画布清除墙体',
+        'erase':       '模式: 擦除 — 点击/拖拽画布清除墙体或箱子',
         'place_hero':  '模式: 放置角色 — 点击空地放置角色',
-        'place_ball':  '模式: 放置球 — 点击空地放置球（不能和角色同格）',
+        'place_ball':  '模式: 放置球 — 点击空地放置球（不能和角色/箱子同格）',
+        'place_crate': '模式: 放置箱子 — 点击空地放置箱子',
         'play':        '模式: 操控 — 方向键/WASD 移动角色'
       };
       const activeBtns = {
         'wall': btnWall, 'erase': btnErase,
-        'place_hero': btnHero, 'place_ball': btnBall, 'play': btnPlay
+        'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'play': btnPlay
       };
 
       activeBtns[newMode].classList.add('active');
@@ -227,6 +232,7 @@
     btnErase.addEventListener('click', () => setMode('erase'));
     btnHero.addEventListener('click', () => setMode('place_hero'));
     btnBall.addEventListener('click', () => setMode('place_ball'));
+    btnCrate.addEventListener('click', () => setMode('place_crate'));
     btnPlay.addEventListener('click', () => setMode('play'));
 
     // === 导出 ===
@@ -276,6 +282,7 @@
       if (e.key === '3') setMode('place_hero');
       if (e.key === '4') setMode('play');
       if (e.key === '5') setMode('place_ball');
+      if (e.key === '6') setMode('place_crate');
 
       // 角色移动（仅操控模式且有角色时）
       if (mode === 'play' && hero) {
@@ -296,14 +303,23 @@
           // 墙体检查
           if (grid[nr][nc] === 1) return;
 
+          // 推箱子：目标格是箱子，尝试沿同方向推动
+          if (grid[nr][nc] === 2) {
+            const cr = nr + dir.dr;
+            const cc = nc + dir.dc;
+            if (cr < 0 || cr >= GRID_SIZE || cc < 0 || cc >= GRID_SIZE) return;
+            if (grid[cr][cc] !== 0) return; // 箱子只能推到空地
+            if (ball && ball.row === cr && ball.col === cc) return;
+            grid[nr][nc] = 0;
+            grid[cr][cc] = 2;
+            hero = { row: nr, col: nc };
           // 推球逻辑：如果目标格是球，尝试沿同方向推动
           if (ball && ball.row === nr && ball.col === nc) {
             const br = nr + dir.dr;
             const bc = nc + dir.dc;
             // 球不能被推出界或推到墙上
             if (br < 0 || br >= GRID_SIZE || bc < 0 || bc >= GRID_SIZE) return;
-            if (grid[br][bc] === 1) return;
-            // 推动成功
+            if (grid[br][bc] !== 0) return; // 球不能被推到墙或箱子上
             ball = { row: br, col: bc };
             hero = { row: nr, col: nc };
           } else {
@@ -323,8 +339,8 @@
                 const diagRow = ball.row + dr;
                 const diagCol = ball.col + dc;
                 const diagOk = dr === 0 || dc === 0 || (
-                  grid[diagRow] && grid[diagRow][ball.col] !== 1 &&
-                  grid[ball.row] && grid[ball.row][diagCol] !== 1
+                  grid[diagRow] && grid[diagRow][ball.col] === 0 &&
+                  grid[ball.row] && grid[ball.row][diagCol] === 0
                 );
                 if (diagOk) {
                   candidates.push({ row: diagRow, col: diagCol });
@@ -335,7 +351,7 @@
                 }
                 for (const c of candidates) {
                   if (c.row >= 0 && c.row < GRID_SIZE && c.col >= 0 && c.col < GRID_SIZE &&
-                      grid[c.row][c.col] !== 1) {
+                      grid[c.row][c.col] === 0) {
                     ball = c;
                     break;
                   }
@@ -392,8 +408,8 @@
     }
 
     function placeHero(row, col) {
-      if (grid[row][col] === 1) {
-        statusEl.textContent = '⚠ 不能把角色放在墙体上！';
+      if (grid[row][col] !== 0) {
+        statusEl.textContent = '⚠ 不能把角色放在墙体或箱子上！';
         return;
       }
       if (ball && ball.row === row && ball.col === col) {
@@ -443,8 +459,8 @@
     }
 
     function placeBall(row, col) {
-      if (grid[row][col] === 1) {
-        statusEl.textContent = '⚠ 不能把球放在墙体上！';
+      if (grid[row][col] !== 0) {
+        statusEl.textContent = '⚠ 不能把球放在墙体或箱子上！';
         return;
       }
       if (hero && hero.row === row && hero.col === col) {
@@ -454,6 +470,60 @@
       ball = { row, col };
       setMode('play');
       statusEl.textContent = '✅ 球已放置！方向键/WASD 移动角色';
+      render();
+    }
+
+    // === 箱子 ===
+    function drawCrateTile(row, col) {
+      const x = col * TILE_SIZE;
+      const y = row * TILE_SIZE;
+      // 木箱底色
+      ctx.fillStyle = '#8B6914';
+      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      // 木板横纹
+      ctx.fillStyle = '#7A5C10';
+      ctx.fillRect(x + 2, y + 4, TILE_SIZE - 4, 2);
+      ctx.fillRect(x + 2, y + 12, TILE_SIZE - 4, 2);
+      ctx.fillRect(x + 2, y + 20, TILE_SIZE - 4, 2);
+      ctx.fillRect(x + 2, y + 28, TILE_SIZE - 4, 2);
+      // 十字绑带
+      ctx.strokeStyle = '#A0792B';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 3, y + TILE_SIZE / 2);
+      ctx.lineTo(x + TILE_SIZE - 3, y + TILE_SIZE / 2);
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(x + TILE_SIZE / 2, y + 3);
+      ctx.lineTo(x + TILE_SIZE / 2, y + TILE_SIZE - 3);
+      ctx.stroke();
+      // 铁钉（四角）
+      ctx.fillStyle = '#555555';
+      ctx.fillRect(x + 5, y + 5, 3, 3);
+      ctx.fillRect(x + TILE_SIZE - 8, y + 5, 3, 3);
+      ctx.fillRect(x + 5, y + TILE_SIZE - 8, 3, 3);
+      ctx.fillRect(x + TILE_SIZE - 8, y + TILE_SIZE - 8, 3, 3);
+      // 边框
+      ctx.strokeStyle = '#6B4F12';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+    }
+
+    function placeCrate(row, col) {
+      if (grid[row][col] !== 0) {
+        statusEl.textContent = '⚠ 此处已被占用！';
+        return;
+      }
+      if (hero && hero.row === row && hero.col === col) {
+        statusEl.textContent = '⚠ 角色在此处！';
+        return;
+      }
+      if (ball && ball.row === row && ball.col === col) {
+        statusEl.textContent = '⚠ 球在此处！';
+        return;
+      }
+      grid[row][col] = 2;
+      statusEl.textContent = '📦 箱子已放置';
       render();
     }
 
@@ -560,6 +630,8 @@
         for (let c = 0; c < GRID_SIZE; c++) {
           if (grid[r][c] === 1) {
             drawWallTile(r, c);
+          } else if (grid[r][c] === 2) {
+            drawCrateTile(r, c);
           } else {
             drawEmptyTile(r, c);
           }
@@ -570,11 +642,11 @@
       drawGridLines();
 
       // 3. 悬停高亮
-      if ((mode === 'place_hero' || mode === 'place_ball') && hoverCell) {
+      if ((mode === 'place_hero' || mode === 'place_ball' || mode === 'place_crate') && hoverCell) {
         const { row, col } = hoverCell;
         const x = col * TILE_SIZE;
         const y = row * TILE_SIZE;
-        const blocked = grid[row][col] === 1 ||
+        const blocked = grid[row][col] !== 0 ||
           (mode === 'place_hero' && ball && ball.row === row && ball.col === col) ||
           (mode === 'place_ball' && hero && hero.row === row && hero.col === col);
         if (blocked) {
