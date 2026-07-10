@@ -215,6 +215,30 @@
       if (e.key === '2') setMode('erase');
       if (e.key === '3') setMode('place_hero');
       if (e.key === '4') setMode('play');
+
+      // 角色移动（仅操控模式且有角色时）
+      if (mode === 'play' && hero) {
+        let { row, col } = hero;
+        const keyMap = {
+          'ArrowUp':    { dr: -1, dc:  0 }, 'w': { dr: -1, dc:  0 }, 'W': { dr: -1, dc:  0 },
+          'ArrowDown':  { dr:  1, dc:  0 }, 's': { dr:  1, dc:  0 }, 'S': { dr:  1, dc:  0 },
+          'ArrowLeft':  { dr:  0, dc: -1 }, 'a': { dr:  0, dc: -1 }, 'A': { dr:  0, dc: -1 },
+          'ArrowRight': { dr:  0, dc:  1 }, 'd': { dr:  0, dc:  1 }, 'D': { dr:  0, dc:  1 },
+        };
+        const dir = keyMap[e.key];
+        if (dir) {
+          e.preventDefault();
+          const nr = row + dir.dr;
+          const nc = col + dir.dc;
+          // 边界检查
+          if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return;
+          // 墙体检查
+          if (grid[nr][nc] === 1) return;
+          hero = { row: nr, col: nc };
+          statusEl.textContent = `角色位置: (${nr}, ${nc})`;
+          render();
+        }
+      }
     });
 
     // === 角色 ===
