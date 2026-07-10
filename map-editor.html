@@ -120,6 +120,68 @@
 
     console.log('Map Editor initialized:', { grid, mode, hero, TILE_SIZE });
 
+    // === 事件处理 ===
+    function getCellFromEvent(e) {
+      const rect = canvas.getBoundingClientRect();
+      const scaleX = CANVAS_SIZE / rect.width;
+      const scaleY = CANVAS_SIZE / rect.height;
+      const mx = (e.clientX - rect.left) * scaleX;
+      const my = (e.clientY - rect.top) * scaleY;
+      const col = Math.floor(mx / TILE_SIZE);
+      const row = Math.floor(my / TILE_SIZE);
+      if (row < 0 || row >= GRID_SIZE || col < 0 || col >= GRID_SIZE) return null;
+      return { row, col };
+    }
+
+    function setTile(row, col, value) {
+      if (grid[row][col] === value) return; // 不变不重绘
+      grid[row][col] = value;
+      render();
+    }
+
+    function handleCanvasDown(e) {
+      if (mode === 'play') return;
+      isDrawing = true;
+      const cell = getCellFromEvent(e);
+      if (!cell) return;
+
+      if (mode === 'wall') {
+        setTile(cell.row, cell.col, 1);
+      } else if (mode === 'erase') {
+        setTile(cell.row, cell.col, 0);
+      } else if (mode === 'place_hero') {
+        placeHero(cell.row, cell.col);
+      }
+    }
+
+    function handleCanvasMove(e) {
+      const cell = getCellFromEvent(e);
+      hoverCell = cell;
+
+      if (mode === 'place_hero') {
+        render(); // 重绘悬停高亮
+        return;
+      }
+
+      if (!isDrawing) return;
+      if (!cell) return;
+
+      if (mode === 'wall') {
+        setTile(cell.row, cell.col, 1);
+      } else if (mode === 'erase') {
+        setTile(cell.row, cell.col, 0);
+      }
+    }
+
+    function handleCanvasUp() {
+      isDrawing = false;
+    }
+
+    canvas.addEventListener('mousedown', handleCanvasDown);
+    canvas.addEventListener('mousemove', handleCanvasMove);
+    canvas.addEventListener('mouseup', handleCanvasUp);
+    canvas.addEventListener('mouseleave', handleCanvasUp);
+
     // === 渲染 ===
     function drawEmptyTile(row, col) {
       const x = col * TILE_SIZE;
