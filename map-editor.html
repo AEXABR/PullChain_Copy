@@ -391,10 +391,17 @@
                 const candidates = [];
                 const diagRow = ball.row + dr;
                 const diagCol = ball.col + dc;
-                const diagOk = dr === 0 || dc === 0 || (
-                  grid[diagRow] && grid[diagRow][ball.col] === T_EMPTY &&
-                  grid[ball.row] && grid[ball.row][diagCol] === T_EMPTY
-                );
+                // 对角拐角检查：空格或可推开的箱子都算通
+                let diagOk = dr === 0 || dc === 0;
+                if (!diagOk) {
+                  const c1r = diagRow, c1c = ball.col; // 拐角1
+                  const c2r = ball.row, c2c = diagCol; // 拐角2
+                  const c1clear = grid[c1r] && (grid[c1r][c1c] === T_EMPTY ||
+                    (isCrate(grid[c1r][c1c]) && tryPushCrate(grid[c1r][c1c], c1r, c1c, dr, dc)));
+                  const c2clear = grid[c2r] && (grid[c2r][c2c] === T_EMPTY ||
+                    (isCrate(grid[c2r][c2c]) && tryPushCrate(grid[c2r][c2c], c2r, c2c, dr, dc)));
+                  diagOk = c1clear && c2clear;
+                }
                 if (diagOk) {
                   candidates.push({ row: diagRow, col: diagCol, pushDr: dr, pushDc: dc });
                 }
