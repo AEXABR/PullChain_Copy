@@ -326,6 +326,8 @@
       const dist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
       if (dist <= 1) return true;
 
+      // 快照grid：diagOk检查中tryPushCrate可能移动箱子，失败时需整体回滚
+      const savedGrid = grid.map(r => [...r]);
       const prevBall = { row: ball.row, col: ball.col };
       const dr = Math.sign(prevRow - ball.row);
       const dc = Math.sign(prevCol - ball.col);
@@ -373,6 +375,7 @@
       const finalDist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
       if (finalDist > 1) {
         ball = prevBall;
+        grid = savedGrid;  // 回滚followBall内所有箱子移动
         return false;
       }
       return true;
