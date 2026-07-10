@@ -307,19 +307,18 @@
             ball = { row: br, col: bc };
             hero = { row: nr, col: nc };
           } else {
-            // 没撞到球，正常移动
+            // 没撞到球：先暂存状态，如果球跟完主角脱离8邻格则撤销
+            const prevHero = { row, col };
+            const prevBall = ball ? { row: ball.row, col: ball.col } : null;
             hero = { row: nr, col: nc };
-            // 绳子逻辑：移动后主角在球的8邻格之外 → 球尝试向主角原位置靠近一步
-            // 球与主角斜角时，位移有X和Y分量，各轴独立检查墙体
+
             if (ball) {
               const dist = Math.max(Math.abs(nr - ball.row), Math.abs(nc - ball.col));
               if (dist > 1) {
-                const tr = row; // 目标：主角移动前的位置
+                const tr = row;
                 const tc = col;
-                const dr = Math.sign(tr - ball.row); // -1, 0, 1
+                const dr = Math.sign(tr - ball.row);
                 const dc = Math.sign(tc - ball.col);
-                // 候选移动：优先对角线，被墙挡则降级为单轴
-                // 对角线需检查两个拐角格，防止穿墙
                 const candidates = [];
                 const diagRow = ball.row + dr;
                 const diagCol = ball.col + dc;
@@ -331,8 +330,8 @@
                   candidates.push({ row: diagRow, col: diagCol });
                 }
                 if (dr !== 0 && dc !== 0) {
-                  candidates.push({ row: diagRow, col: ball.col });      // 只Y轴
-                  candidates.push({ row: ball.row, col: diagCol }); // 只X轴
+                  candidates.push({ row: diagRow, col: ball.col });
+                  candidates.push({ row: ball.row, col: diagCol });
                 }
                 for (const c of candidates) {
                   if (c.row >= 0 && c.row < GRID_SIZE && c.col >= 0 && c.col < GRID_SIZE &&
@@ -341,6 +340,16 @@
                     break;
                   }
                 }
+              }
+            }
+
+            // 球跟完后主角仍脱离8邻格 → 撤销移动
+            if (ball) {
+              const finalDist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
+              if (finalDist > 1) {
+                hero = prevHero;
+                ball = prevBall;
+                return;
               }
             }
           }
