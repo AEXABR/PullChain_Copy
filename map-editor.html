@@ -217,6 +217,51 @@
       if (e.key === '4') setMode('play');
     });
 
+    // === 角色 ===
+    function drawHero(row, col) {
+      const x = col * TILE_SIZE;
+      const y = row * TILE_SIZE;
+      const s = TILE_SIZE / 8; // 将格子分成 8×8 像素网格
+
+      // 头发（深棕，顶部 2×3）
+      ctx.fillStyle = '#4a3728';
+      ctx.fillRect(x + s * 3, y + s * 0, s * 2, s * 2);
+
+      // 脸（肤色，第2-3行）
+      ctx.fillStyle = '#f4c89a';
+      ctx.fillRect(x + s * 3, y + s * 2, s * 2, s * 2);
+
+      // 眼睛（黑点）
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillRect(x + s * 3, y + s * 2, s, s);
+      ctx.fillRect(x + s * 5, y + s * 2, s, s);
+
+      // 身体（蓝色衬衫）
+      ctx.fillStyle = '#4488cc';
+      ctx.fillRect(x + s * 2, y + s * 4, s * 4, s * 2);
+
+      // 手臂
+      ctx.fillStyle = '#f4c89a';
+      ctx.fillRect(x + s * 1, y + s * 4, s, s * 2);
+      ctx.fillRect(x + s * 6, y + s * 4, s, s * 2);
+
+      // 腿（深蓝裤子）
+      ctx.fillStyle = '#335577';
+      ctx.fillRect(x + s * 2, y + s * 6, s * 2, s * 2);
+      ctx.fillRect(x + s * 4, y + s * 6, s * 2, s * 2);
+    }
+
+    function placeHero(row, col) {
+      if (grid[row][col] === 1) {
+        statusEl.textContent = '⚠ 不能把角色放在墙体上！';
+        return;
+      }
+      hero = { row, col };
+      setMode('play'); // 放置后自动切换到操控模式
+      statusEl.textContent = '✅ 角色已放置！方向键/WASD 移动';
+      render();
+    }
+
     // === 渲染 ===
     function drawEmptyTile(row, col) {
       const x = col * TILE_SIZE;
