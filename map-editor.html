@@ -115,33 +115,15 @@
       return null;
     }
 
-    // 尝试推箱子：优先全方向推，被挡降级单轴推同一箱子。返回是否成功
+    // 尝试推箱子：只沿指定方向推，被挡则失败。返回是否成功
     function tryPushCrate(crateType, cr, cc, pushDr, pushDc) {
       const pr = cr + pushDr;
       const pc = cc + pushDc;
-      // 全方向
       if (pr >= 0 && pr < GRID_SIZE && pc >= 0 && pc < GRID_SIZE &&
           grid[pr][pc] === T_EMPTY && !(hero.row === pr && hero.col === pc)) {
         grid[cr][cc] = T_EMPTY;
         grid[pr][pc] = crateType;
         return true;
-      }
-      // 对角被挡 → 降级单轴推同一箱子
-      if (pushDr !== 0 && pushDc !== 0) {
-        const prY = cr + pushDr;
-        const pcX = cc + pushDc;
-        if (prY >= 0 && prY < GRID_SIZE && grid[prY][cc] === T_EMPTY &&
-            !(hero.row === prY && hero.col === cc)) {
-          grid[cr][cc] = T_EMPTY;
-          grid[prY][cc] = crateType;
-          return true;
-        }
-        if (pcX >= 0 && pcX < GRID_SIZE && grid[cr][pcX] === T_EMPTY &&
-            !(hero.row === cr && hero.col === pcX)) {
-          grid[cr][cc] = T_EMPTY;
-          grid[cr][pcX] = crateType;
-          return true;
-        }
       }
       return false;
     }
