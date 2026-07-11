@@ -531,9 +531,7 @@ function render() {
       }
     }
   }
-  // 2. 引线
-  drawWires();
-  // 3. 水
+  // 2. 水
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
       const tile = grid[r][c];
@@ -617,4 +615,7 @@ function render() {
   if (hero) {
     drawHero(hero);
   }
+
+  // 12. 引线（最上层）
+  drawWires();
 }
