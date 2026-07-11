@@ -108,6 +108,8 @@ function getPushChain(r, c, dr, dc, pusherHeight = -1) {
     if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return null;
     const tile = grid[r][c];
     if (tile.base === T_WALL && !(tile.liftWall !== null && stepHeight >= tileFootLevel(r, c))) return null;
+    // 高差阻挡：链中实体脚底低于当前格地面 → 无法推上去
+    if (stepHeight < tileFootLevel(r, c)) return null;
     const ent = entityForPush(r, c);
     if (ent && tile.hasWeb) return null;
     if (!ent) return chain;
@@ -336,6 +338,9 @@ function moveMoths() {
       // 目标格是墙 → 挡住
       if (grid[nr][nc].base === T_WALL) break;
 
+      // 飞行高度低于目标地面 → 挡住（如同墙壁）
+      if (height < tileFootLevel(nr, nc)) break;
+
       // 目标格有实体且顶面高于飞蛾 → 挡住
       const destEnt = entityAt(nr, nc);
       if (destEnt && destEnt.height + destEnt.selfHeight > height) break;
@@ -434,7 +439,7 @@ function followBall(prevRow, prevCol) {
       const canStep = !ent || ball.height >= ent.height + ent.selfHeight;
       const targetFoot = tileFootLevel(c.row, c.col);
       const tile = grid[c.row][c.col];
-      const canAccess = tile.base !== T_WALL || (tile.liftWall !== null && ball.height >= targetFoot);
+      const canAccess = ball.height >= targetFoot && (tile.base !== T_WALL || tile.liftWall !== null);
       if (canStep && canAccess) {
         ball.row = c.row; ball.col = c.col;
         break;
@@ -458,6 +463,9 @@ function tryMoveHero(dr, dc) {
   const targetFoot = tileFootLevel(nr, nc);
   const targetTile = grid[nr][nc];
   if (targetTile.base === T_WALL && !(targetTile.liftWall !== null && hero.height >= targetFoot)) return false;
+
+  // 高差阻挡：脚底低于目标地面则无法上去（如同墙壁效果）
+  if (hero.height < targetFoot) return false;
 
   // 主角高度 >= 目标实体顶面 → 站到同格上方（不推动）
   const targetEnt = entityAt(nr, nc);
