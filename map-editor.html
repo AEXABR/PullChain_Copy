@@ -76,6 +76,7 @@
   <h1>Map Editor</h1>
   <div id="toolbar">
     <button id="btn-wall" class="active" data-mode="wall">🖼 画墙 [1]</button>
+    <button id="btn-diag" data-mode="diag">◤ 斜角墙 [7]</button>
     <button id="btn-erase" data-mode="erase">🗑 擦除 [2]</button>
     <button id="btn-hero" data-mode="place_hero">🧍 放角色 [3]</button>
     <button id="btn-ball" data-mode="place_ball">🟡 放球 [5]</button>
@@ -168,6 +169,7 @@
     const ctx = canvas.getContext('2d');
     const statusEl = document.getElementById('status');
     const btnWall = document.getElementById('btn-wall');
+    const btnDiag = document.getElementById('btn-diag');
     const btnErase = document.getElementById('btn-erase');
     const btnHero = document.getElementById('btn-hero');
     const btnBall = document.getElementById('btn-ball');
@@ -175,7 +177,7 @@
     const btnPlay = document.getElementById('btn-play');
     const btnExport = document.getElementById('btn-export');
     const btnClear = document.getElementById('btn-clear');
-    const allBtns = [btnWall, btnErase, btnHero, btnBall, btnCrate, btnPlay];
+    const allBtns = [btnWall, btnDiag, btnErase, btnHero, btnBall, btnCrate, btnPlay];
 
     // === 状态 ===
     let mode = 'wall';          // 'wall' | 'erase' | 'place_hero' | 'place_ball' | 'play'
@@ -184,7 +186,9 @@
     let ball = null;             // Ball | null
     const crates = new Map();    // "row,col" -> Crate
     let currentCrateKey = 'wood'; // 当前选中的箱子类型
+    let currentDiagCorner = 'TL';  // 当前斜角墙缺口朝向
     let waterTiles = new Set();  // 有水贴图的空地坐标 "row,col"
+    const diagCorners = new Map(); // "row,col" → 'TL'|'TR'|'BL'|'BR'  斜角墙缺口朝向
     let isDrawing = false;      // 鼠标拖拽中
     let hoverCell = null;       // {row, col} | null  鼠标悬停格子
 
@@ -223,6 +227,7 @@
           crates.delete(K(row, col));
         }
         waterTiles.delete(K(row, col));
+        diagCorners.delete(K(row, col));
       }
       if (grid[row][col] === value) return;
       grid[row][col] = value;
@@ -237,6 +242,7 @@
 
       const placeActions = {
         wall:        () => setTile(cell.row, cell.col, T_WALL),
+        diag:        () => placeDiagWall(cell.row, cell.col),
         erase:       () => setTile(cell.row, cell.col, T_EMPTY),
         place_hero:  () => placeHero(cell.row, cell.col),
         place_ball:  () => placeBall(cell.row, cell.col),
@@ -259,6 +265,7 @@
 
       const dragActions = {
         wall:  () => setTile(cell.row, cell.col, T_WALL),
+        diag:  () => placeDiagWall(cell.row, cell.col),
         erase: () => setTile(cell.row, cell.col, T_EMPTY),
       };
       if (dragActions[mode]) dragActions[mode]();
@@ -285,6 +292,7 @@
 
       const modeLabels = {
         'wall':        '模式: 画墙 — 点击/拖拽画布放置墙体',
+        'diag':        `模式: 画斜角墙(${DIAG_SYMBOLS[currentDiagCorner]}缺口) — 点击/拖拽画布放置`,
         'erase':       '模式: 擦除 — 点击/拖拽画布清除墙体或箱子',
         'place_hero':  '模式: 放置角色 — 点击空地放置角色',
         'place_ball':  '模式: 放置球 — 点击空地放置球（不能和角色/箱子同格）',
@@ -292,19 +300,27 @@
         'play':        '模式: 操控 — 方向键/WASD 移动角色'
       };
       const activeBtns = {
-        'wall': btnWall, 'erase': btnErase,
+        'wall': btnWall, 'diag': btnDiag, 'erase': btnErase,
         'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'play': btnPlay
       };
 
       activeBtns[newMode].classList.add('active');
       if (newMode === 'place_crate') updateCrateBtn();
+      if (newMode === 'diag') updateDiagBtn();
       statusEl.textContent = modeLabels[newMode];
       render();
     }
 
+    const DIAG_CORNERS = ['TL', 'TR', 'BL', 'BR'];
+    const DIAG_SYMBOLS = { TL: '◤', TR: '◥', BL: '◣', BR: '◢' };
+
     function updateCrateBtn() {
       const type = CRATES[currentCrateKey];
       btnCrate.textContent = `${type.emoji} ${type.name} [6]`;
+    }
+
+    function updateDiagBtn() {
+      btnDiag.textContent = `${DIAG_SYMBOLS[currentDiagCorner]} 斜角墙 [7]`;
     }
 
     document.querySelectorAll('#toolbar button[data-mode]').forEach(b =>
@@ -318,6 +334,14 @@
           statusEl.textContent = `模式: 放置${CRATES[currentCrateKey].name} — 点击空地放置`;
           return;
         }
+        if (b.dataset.mode === 'diag' && mode === 'diag') {
+          // 已在斜角墙模式则循环切换缺口朝向
+          const idx = DIAG_CORNERS.indexOf(currentDiagCorner);
+          currentDiagCorner = DIAG_CORNERS[(idx + 1) % DIAG_CORNERS.length];
+          updateDiagBtn();
+          statusEl.textContent = `模式: 画斜角墙(${DIAG_SYMBOLS[currentDiagCorner]}缺口) — 点击/拖拽画布放置`;
+          return;
+        }
         setMode(b.dataset.mode);
       }));
 
@@ -327,10 +351,13 @@
       for (const crate of crates.values()) {
         tiles[crate.row][crate.col] = Object.keys(CRATES).indexOf(crate.crateKey) + 2;
       }
+      const diagData = {};
+      for (const [k, v] of diagCorners) diagData[k] = v;
       const data = {
         width: GRID_SIZE,
         height: GRID_SIZE,
         tiles: tiles,
+        diagCorners: diagData,
         heroStart: hero ? { row: hero.row, col: hero.col } : null,
         ballStart: ball ? { row: ball.row, col: ball.col } : null
       };
@@ -361,12 +388,22 @@
       crates.clear();
       currentCrateKey = 'wood';
       waterTiles.clear();
+      diagCorners.clear();
       updateCrateBtn();
       statusEl.textContent = '🗺 地图已清空';
       render();
     }
 
     btnClear.addEventListener('click', clearMap);
+
+    // 斜角墙拐角→缺口映射：给定球对角移动方向(dr,dc)，返回两个拐角格各需哪个缺口
+    function diagCornersFor(dr, dc) {
+      if (dr === -1 && dc === -1) return ['BL', 'TR']; // ↖ c1需BL, c2需TR
+      if (dr === -1 && dc ===  1) return ['BR', 'TL']; // ↗ c1需BR, c2需TL
+      if (dr ===  1 && dc === -1) return ['TL', 'BR']; // ↙ c1需TL, c2需BR
+      if (dr ===  1 && dc ===  1) return ['TR', 'BL']; // ↘ c1需TR, c2需BL
+      return null;
+    }
 
     // 绳子跟随：主角移动后球尝试跟上，返回false则主角需撤销移动
     function followBall(prevRow, prevCol) {
@@ -387,8 +424,11 @@
         const c2r = ball.row, c2c = diagCol;
         const c1chain = getPushChain(c1r, c1c, dr, 0);
         const c2chain = getPushChain(c2r, c2c, 0, dc);
-        const c1clear = grid[c1r] && (!isSolid(c1r, c1c) || c1chain !== null);
-        const c2clear = grid[c2r] && (!isSolid(c2r, c2c) || c2chain !== null);
+        const needed = diagCornersFor(dr, dc);
+        const c1clear = grid[c1r] && (!isSolid(c1r, c1c) || c1chain !== null
+                                       || (needed && diagCorners.get(K(c1r, c1c)) === needed[0]));
+        const c2clear = grid[c2r] && (!isSolid(c2r, c2c) || c2chain !== null
+                                       || (needed && diagCorners.get(K(c2r, c2c)) === needed[1]));
         if (c1clear && c2clear) {
           diagOk = true;
           diagCorner = { c1chain, c2chain };
@@ -497,7 +537,7 @@
       'ArrowLeft':{dr:0,dc:-1},'a':{dr:0,dc:-1},'A':{dr:0,dc:-1},
       'ArrowRight':{dr:0,dc:1},'d':{dr:0,dc:1},'D':{dr:0,dc:1},
     };
-    const KEY_MODE = { '1':'wall','2':'erase','3':'place_hero','4':'play','5':'place_ball','6':'place_crate' };
+    const KEY_MODE = { '1':'wall','2':'erase','3':'place_hero','4':'play','5':'place_ball','6':'place_crate','7':'diag' };
 
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -736,6 +776,15 @@
       ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
     }
 
+    function placeDiagWall(row, col) {
+      if (isSolid(row, col)) {
+        // 允许覆盖已有的斜角墙（更改缺口朝向）或普通墙（升级为斜角墙）
+      }
+      setTile(row, col, T_WALL);
+      diagCorners.set(K(row, col), currentDiagCorner);
+      statusEl.textContent = `${DIAG_SYMBOLS[currentDiagCorner]} 斜角墙(${currentDiagCorner}缺口)已放置`;
+    }
+
     function placeCrate(row, col) {
       if (isSolid(row, col)) {
         statusEl.textContent = '⚠ 此处已被占用！';
@@ -834,6 +883,55 @@
       ctx.stroke();
     }
 
+    function drawDiagWallTile(row, col, corner) {
+      const x = col * TILE_SIZE;
+      const y = row * TILE_SIZE;
+      // 与普通墙一致的底色和砖纹
+      ctx.fillStyle = '#555566';
+      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      ctx.strokeStyle = '#777788';
+      ctx.lineWidth = 1;
+      const third = TILE_SIZE / 3;
+      ctx.beginPath();
+      ctx.moveTo(x, y + third);
+      ctx.lineTo(x + TILE_SIZE, y + third);
+      ctx.moveTo(x, y + third * 2);
+      ctx.lineTo(x + TILE_SIZE, y + third * 2);
+      ctx.moveTo(x + TILE_SIZE / 2, y);
+      ctx.lineTo(x + TILE_SIZE / 2, y + third);
+      ctx.moveTo(x, y + third);
+      ctx.lineTo(x, y + third * 2);
+      ctx.moveTo(x + TILE_SIZE / 2, y + third * 2);
+      ctx.lineTo(x + TILE_SIZE / 2, y + TILE_SIZE);
+      ctx.stroke();
+      ctx.strokeStyle = '#444455';
+      ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+
+      // 缺口指示：在对应角画一个小三角，颜色和空地一致
+      ctx.fillStyle = '#3a3a4e';
+      const gap = TILE_SIZE / 4;
+      const corners = {
+        TL: [[x, y], [x + gap, y], [x, y + gap]],
+        TR: [[x + TILE_SIZE, y], [x + TILE_SIZE - gap, y], [x + TILE_SIZE, y + gap]],
+        BL: [[x, y + TILE_SIZE], [x + gap, y + TILE_SIZE], [x, y + TILE_SIZE - gap]],
+        BR: [[x + TILE_SIZE, y + TILE_SIZE], [x + TILE_SIZE - gap, y + TILE_SIZE], [x + TILE_SIZE, y + TILE_SIZE - gap]],
+      };
+      const pts = corners[corner];
+      ctx.beginPath();
+      ctx.moveTo(pts[0][0], pts[0][1]);
+      ctx.lineTo(pts[1][0], pts[1][1]);
+      ctx.lineTo(pts[2][0], pts[2][1]);
+      ctx.fill();
+
+      // 高光边
+      ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+      ctx.beginPath();
+      ctx.moveTo(x, y + TILE_SIZE);
+      ctx.lineTo(x, y);
+      ctx.lineTo(x + TILE_SIZE, y);
+      ctx.stroke();
+    }
+
     function drawGridLines() {
       ctx.strokeStyle = '#4a4a5e';
       ctx.lineWidth = 0.5;
@@ -857,7 +955,12 @@
       for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
           if (grid[r][c] === T_WALL) {
-            drawWallTile(r, c);
+            const corner = diagCorners.get(K(r, c));
+            if (corner) {
+              drawDiagWallTile(r, c, corner);
+            } else {
+              drawWallTile(r, c);
+            }
           } else if (waterTiles.has(K(r, c))) {
             drawWaterTile(r, c);
           } else {
