@@ -433,6 +433,39 @@
       return true;
     }
 
+    // 尝试移动主角：快照→推箱→移动→跟随→失败回滚。返回 true=成功
+    function tryMoveHero(dr, dc) {
+      const nr = hero.row + dr, nc = hero.col + dc;
+
+      // 边界 / 墙检查
+      if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return false;
+      if (grid[nr][nc] === T_WALL) return false;
+
+      // 链式推动扫描
+      const chain = getPushChain(nr, nc, dr, dc);
+      if (chain === null) return false;
+
+      // 快照（回滚用）
+      const savedCrates = snapshotCrates();
+      const savedHero = { row: hero.row, col: hero.col };
+      const savedBall = ball ? { row: ball.row, col: ball.col } : null;
+
+      // 执行：推箱子 + 移动主角
+      const prevRow = hero.row, prevCol = hero.col;
+      pushChain(chain, dr, dc);
+      hero.row = nr; hero.col = nc;
+
+      // 绳子跟随
+      if (!followBall(prevRow, prevCol)) {
+        restoreCrates(savedCrates);
+        if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
+        hero.row = savedHero.row; hero.col = savedHero.col;
+        ball.toggle();
+        return false;
+      }
+      return true;
+    }
+
     // 融化雪块：球开灯时，周围8格内的雪块融化为水
     function meltSnow() {
       if (!ball || !ball.lightOn) return;
