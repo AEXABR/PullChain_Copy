@@ -419,6 +419,7 @@
     function followBall(prevRow, prevCol) {
       if (!ball) return true;
       if (dist(hero.row, hero.col, ball.row, ball.col) <= 1) return true;
+      if (webTiles.has(K(ball.row, ball.col))) return false; // 球被蜘蛛网粘住
 
       const prevBallRow = ball.row, prevBallCol = ball.col;
       const dr = Math.sign(prevRow - ball.row);
