@@ -97,6 +97,19 @@
     const T_EMPTY = 0;
     const T_WALL  = 1;
 
+    // === 实体类 ===
+    class Entity {
+      constructor(row, col) { this.row = row; this.col = col; }
+    }
+    class Hero  extends Entity {}
+    class Ball  extends Entity {
+      constructor(row, col) { super(row, col); this.lightOn = true; }
+      toggle() { this.lightOn = !this.lightOn; }
+    }
+    class Crate extends Entity {
+      constructor(row, col, crateKey) { super(row, col); this.crateKey = crateKey; }
+    }
+
     // === 箱子注册表（扩展新箱子只需在这里加一项） ===
     const CRATES = {
       wood: { id: 2, name: '木箱', emoji: '📦', pushable: true },
@@ -104,23 +117,25 @@
     };
 
     // 工具函数
-    function isSolid(v)  { return v !== T_EMPTY; }
-    function isCrate(v)  { return v >= 2; }
-    function crateById(id) {
-      for (const key of Object.keys(CRATES)) {
-        if (CRATES[key].id === id) return CRATES[key];
-      }
-      return null;
+    function crateAt(r, c)     { return crates.get(`${r},${c}`) || null; }
+    function entityAt(r, c) {
+      if (hero && hero.row === r && hero.col === c) return hero;
+      if (ball && ball.row === r && ball.col === c) return ball;
+      return crateAt(r, c);
     }
+    function isSolid(r, c)     { return grid[r][c] === T_WALL || crateAt(r, c) !== null; }
 
     // 尝试推箱子：只沿指定方向推，被挡则失败。返回是否成功
-    function tryPushCrate(crateType, cr, cc, pushDr, pushDc) {
-      const pr = cr + pushDr;
-      const pc = cc + pushDc;
+    function tryPushCrate(crate, pushDr, pushDc) {
+      const pr = crate.row + pushDr;
+      const pc = crate.col + pushDc;
       if (pr >= 0 && pr < GRID_SIZE && pc >= 0 && pc < GRID_SIZE &&
-          grid[pr][pc] === T_EMPTY && !(hero.row === pr && hero.col === pc)) {
-        grid[cr][cc] = T_EMPTY;
-        grid[pr][pc] = crateType;
+          grid[pr][pc] === T_EMPTY && !crateAt(pr, pc) &&
+          !(hero && hero.row === pr && hero.col === pc)) {
+        crates.delete(`${crate.row},${crate.col}`);
+        crate.row = pr;
+        crate.col = pc;
+        crates.set(`${pr},${pc}`, crate);
         return true;
       }
       return false;
@@ -143,9 +158,9 @@
     // === 状态 ===
     let mode = 'wall';          // 'wall' | 'erase' | 'place_hero' | 'place_ball' | 'play'
     let grid = [];              // grid[row][col]: 0=空地, 1=墙体, >=2=箱子(见CRATES)
-    let hero = null;            // {row, col} | null
-    let ball = null;            // {row, col} | null
-    let ballOn = true;          // 球形态：true=开灯(亮黄), false=关灯(灰色)
+    let hero = null;             // Hero | null
+    let ball = null;             // Ball | null
+    const crates = new Map();    // "row,col" -> Crate
     let currentCrateKey = 'wood'; // 当前选中的箱子类型
     let waterTiles = new Set();  // 有水贴图的空地坐标 "row,col"
     let isDrawing = false;      // 鼠标拖拽中
@@ -175,13 +190,15 @@
 
     function setTile(row, col, value) {
       if (value === T_WALL) {
-        if (hero && hero.row === row && hero.col === col) {
+        const ent = entityAt(row, col);
+        if (ent instanceof Hero) {
           hero = null;
           statusEl.textContent = '⚠ 角色被墙体覆盖，已移除角色';
-        }
-        if (ball && ball.row === row && ball.col === col) {
+        } else if (ent instanceof Ball) {
           ball = null;
           statusEl.textContent = '⚠ 球被墙体覆盖，已移除球';
+        } else if (ent instanceof Crate) {
+          crates.delete(`${row},${col}`);
         }
       }
       if (grid[row][col] === value) return;
@@ -283,10 +300,14 @@
 
     // === 导出 ===
     function exportMap() {
+      const tiles = grid.map(row => [...row]);
+      for (const crate of crates.values()) {
+        tiles[crate.row][crate.col] = CRATES[crate.crateKey].id;
+      }
       const data = {
         width: GRID_SIZE,
         height: GRID_SIZE,
-        tiles: grid.map(row => [...row]),
+        tiles: tiles,
         heroStart: hero ? { row: hero.row, col: hero.col } : null,
         ballStart: ball ? { row: ball.row, col: ball.col } : null
       };
@@ -314,7 +335,7 @@
       }
       hero = null;
       ball = null;
-      ballOn = true;
+      crates.clear();
       currentCrateKey = 'wood';
       waterTiles.clear();
       updateCrateBtn();
@@ -330,9 +351,10 @@
       const dist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
       if (dist <= 1) return true;
 
-      // 快照grid：diagOk检查中tryPushCrate可能移动箱子，失败时需整体回滚
-      const savedGrid = grid.map(r => [...r]);
-      const prevBall = { row: ball.row, col: ball.col };
+      // 快照crates：diagOk检查中tryPushCrate可能移动箱子，失败时需整体回滚
+      const savedCrates = new Map();
+      for (const [k, v] of crates) savedCrates.set(k, new Crate(v.row, v.col, v.crateKey));
+      const prevBallRow = ball.row, prevBallCol = ball.col;
       const dr = Math.sign(prevRow - ball.row);
       const dc = Math.sign(prevCol - ball.col);
       const candidates = [];
@@ -343,10 +365,12 @@
       if (!diagOk) {
         const c1r = diagRow, c1c = ball.col;
         const c2r = ball.row, c2c = diagCol;
-        const c1clear = grid[c1r] && (!isSolid(grid[c1r][c1c]) ||
-          (isCrate(grid[c1r][c1c]) && tryPushCrate(grid[c1r][c1c], c1r, c1c, dr, 0)));
-        const c2clear = grid[c2r] && (!isSolid(grid[c2r][c2c]) ||
-          (isCrate(grid[c2r][c2c]) && tryPushCrate(grid[c2r][c2c], c2r, c2c, 0, dc)));
+        const c1crate = crateAt(c1r, c1c);
+        const c2crate = crateAt(c2r, c2c);
+        const c1clear = grid[c1r] && (!isSolid(c1r, c1c) ||
+          (c1crate && tryPushCrate(c1crate, dr, 0)));
+        const c2clear = grid[c2r] && (!isSolid(c2r, c2c) ||
+          (c2crate && tryPushCrate(c2crate, 0, dc)));
         diagOk = c1clear && c2clear;
       }
       if (diagOk) candidates.push({ row: diagRow, col: diagCol, pushDr: dr, pushDc: dc });
@@ -360,10 +384,11 @@
         if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
         const d = Math.max(Math.abs(hero.row - c.row), Math.abs(hero.col - c.col));
         if (d > 1) continue;
-        const cell = grid[c.row][c.col];
-        if (!isCrate(cell)) continue;
-        if (tryPushCrate(cell, c.row, c.col, c.pushDr, c.pushDc)) {
-          ball = { row: c.row, col: c.col };
+        const crate = crateAt(c.row, c.col);
+        if (!crate) continue;
+        if (tryPushCrate(crate, c.pushDr, c.pushDc)) {
+          ball.row = c.row;
+          ball.col = c.col;
           ballMoved = true;
           break;
         }
@@ -371,10 +396,11 @@
       if (!ballMoved) {
         for (const c of candidates) {
           if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
-          if (isSolid(grid[c.row][c.col])) continue;
+          if (isSolid(c.row, c.col)) continue;
           const d = Math.max(Math.abs(hero.row - c.row), Math.abs(hero.col - c.col));
           if (d > 1) continue;
-          ball = c;
+          ball.row = c.row;
+          ball.col = c.col;
           ballMoved = true;
           break;
         }
@@ -382,8 +408,10 @@
 
       const finalDist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
       if (finalDist > 1) {
-        ball = prevBall;
-        grid = savedGrid;  // 回滚followBall内所有箱子移动
+        ball.row = prevBallRow; ball.col = prevBallCol;
+        // 回滚followBall内所有箱子移动
+        crates.clear();
+        for (const [k, v] of savedCrates) crates.set(k, v);
         return false;
       }
       return true;
@@ -391,16 +419,13 @@
 
     // 融化雪块：球开灯时，周围8格内的雪块融化为水
     function meltSnow() {
-      if (!ball || !ballOn) return;
-      for (let r = 0; r < GRID_SIZE; r++) {
-        for (let c = 0; c < GRID_SIZE; c++) {
-          if (grid[r][c] === CRATES.snow.id) {
-            const dist = Math.max(Math.abs(ball.row - r), Math.abs(ball.col - c));
-            if (dist <= 1) {
-              grid[r][c] = T_EMPTY;
-              waterTiles.add(`${r},${c}`);
-            }
-          }
+      if (!ball || !ball.lightOn) return;
+      for (const [key, crate] of crates) {
+        if (crate.crateKey !== 'snow') continue;
+        const dist = Math.max(Math.abs(ball.row - crate.row), Math.abs(ball.col - crate.col));
+        if (dist <= 1) {
+          crates.delete(key);
+          waterTiles.add(key);
         }
       }
     }
@@ -419,34 +444,39 @@
       if (KEY_MODE[e.key]) { setMode(KEY_MODE[e.key]); return; }
 
       if (mode === 'play' && hero) {
-        let { row, col } = hero;
         const dir = KEY_DIR[e.key];
         if (dir) {
           e.preventDefault();
-          const nr = row + dir.dr;
-          const nc = col + dir.dc;
+          const nr = hero.row + dir.dr;
+          const nc = hero.col + dir.dc;
           // 边界检查
           if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return;
           // 墙体检查
           if (grid[nr][nc] === T_WALL) return;
 
+          const prevRow = hero.row, prevCol = hero.col;
+
           // 推箱子
-          if (isCrate(grid[nr][nc])) {
-            const crateType = grid[nr][nc];
+          const pushCrate = crateAt(nr, nc);
+          if (pushCrate) {
             const cr = nr + dir.dr;
             const cc = nc + dir.dc;
             if (cr < 0 || cr >= GRID_SIZE || cc < 0 || cc >= GRID_SIZE) return;
-            if (isSolid(grid[cr][cc])) return;
+            if (isSolid(cr, cc)) return;
             if (ball && ball.row === cr && ball.col === cc) return;
-            grid[nr][nc] = T_EMPTY;
-            grid[cr][cc] = crateType;
-            hero = { row: nr, col: nc };
+            // 移动箱子到新位置
+            crates.delete(`${nr},${nc}`);
+            pushCrate.row = cr; pushCrate.col = cc;
+            crates.set(`${cr},${cc}`, pushCrate);
+            hero.row = nr; hero.col = nc;
             // 推完箱子也要绳子跟随
-            if (!followBall(row, col)) {
-              grid[cr][cc] = T_EMPTY;
-              grid[nr][nc] = crateType;
-              hero = { row, col };
-              ballOn = !ballOn;
+            if (!followBall(prevRow, prevCol)) {
+              // 回滚箱子
+              crates.delete(`${cr},${cc}`);
+              pushCrate.row = nr; pushCrate.col = nc;
+              crates.set(`${nr},${nc}`, pushCrate);
+              hero.row = prevRow; hero.col = prevCol;
+              ball.toggle();
               render();
               return;
             }
@@ -455,15 +485,15 @@
             const br = nr + dir.dr;
             const bc = nc + dir.dc;
             if (br < 0 || br >= GRID_SIZE || bc < 0 || bc >= GRID_SIZE) return;
-            if (isSolid(grid[br][bc])) return;
-            ball = { row: br, col: bc };
-            hero = { row: nr, col: nc };
+            if (isSolid(br, bc)) return;
+            ball.row = br; ball.col = bc;
+            hero.row = nr; hero.col = nc;
           // 普通移动 + 绳子跟随
           } else {
-            hero = { row: nr, col: nc };
-            if (!followBall(row, col)) {
-              hero = { row, col };
-              ballOn = !ballOn;
+            hero.row = nr; hero.col = nc;
+            if (!followBall(prevRow, prevCol)) {
+              hero.row = prevRow; hero.col = prevCol;
+              ball.toggle();
               render();
               return;
             }
@@ -471,7 +501,7 @@
 
           meltSnow();
           statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +
-            (ball ? `  球位置: (${ball.row}, ${ball.col}) [${ballOn ? '💡开' : '🌑关'}]` : '') +
+            (ball ? `  球位置: (${ball.row}, ${ball.col}) [${ball.lightOn ? '💡开' : '🌑关'}]` : '') +
             (ball ? `  距离: ${Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col))}` : '');
           render();
         }
@@ -508,7 +538,7 @@
     }
 
     function placeHero(row, col) {
-      if (isSolid(grid[row][col])) {
+      if (isSolid(row, col)) {
         statusEl.textContent = '⚠ 不能把角色放在墙体或箱子上！';
         return;
       }
@@ -516,7 +546,7 @@
         statusEl.textContent = '⚠ 不能把角色放在球上！';
         return;
       }
-      hero = { row, col };
+      hero = new Hero(row, col);
       // 如果球还没放，自动切换到放球模式
       if (!ball) {
         setMode('place_ball');
@@ -534,7 +564,7 @@
       const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
 
-      if (ballOn) {
+      if (ball && ball.lightOn) {
         // === 开灯形态：亮黄色发光球 ===
         // 外发光
         const cx = x + TILE_SIZE / 2;
@@ -586,7 +616,7 @@
     }
 
     function placeBall(row, col) {
-      if (isSolid(grid[row][col])) {
+      if (isSolid(row, col)) {
         statusEl.textContent = '⚠ 不能把球放在墙体或箱子上！';
         return;
       }
@@ -594,15 +624,16 @@
         statusEl.textContent = '⚠ 不能把球放在角色上！';
         return;
       }
-      ball = { row, col };
+      ball = new Ball(row, col);
       setMode('play');
       statusEl.textContent = '✅ 球已放置！方向键/WASD 移动角色';
       render();
     }
 
     // === 箱子 ===
-    function drawCrateTile(row, col, crateId) {
-      if (crateId === CRATES.snow.id) {
+    function drawCrateTile(crate) {
+      const row = crate.row, col = crate.col;
+      if (crate.crateKey === 'snow') {
         drawSnowTile(row, col);
         return;
       }
@@ -691,7 +722,7 @@
     }
 
     function placeCrate(row, col, crateKey) {
-      if (isSolid(grid[row][col])) {
+      if (isSolid(row, col)) {
         statusEl.textContent = '⚠ 此处已被占用！';
         return;
       }
@@ -703,8 +734,9 @@
         statusEl.textContent = '⚠ 球在此处！';
         return;
       }
-      const type = CRATES[crateKey || currentCrateKey];
-      grid[row][col] = type.id;
+      const key = crateKey || currentCrateKey;
+      const type = CRATES[key];
+      crates.set(`${row},${col}`, new Crate(row, col, key));
       statusEl.textContent = `${type.emoji} ${type.name}已放置`;
       render();
     }
@@ -807,19 +839,22 @@
     function render() {
       ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-      // 1. 绘制所有格子
+      // 1. 绘制所有格子（墙、水、空地）
       for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
           if (grid[r][c] === T_WALL) {
             drawWallTile(r, c);
-          } else if (isCrate(grid[r][c])) {
-            drawCrateTile(r, c, grid[r][c]);
           } else if (waterTiles.has(`${r},${c}`)) {
             drawWaterTile(r, c);
           } else {
             drawEmptyTile(r, c);
           }
         }
+      }
+
+      // 1.5 绘制所有箱子（叠在格子上）
+      for (const crate of crates.values()) {
+        drawCrateTile(crate);
       }
 
       // 2. 网格线
@@ -830,7 +865,7 @@
         const { row, col } = hoverCell;
         const x = col * TILE_SIZE;
         const y = row * TILE_SIZE;
-        const blocked = isSolid(grid[row][col]) ||
+        const blocked = isSolid(row, col) ||
           (mode === 'place_hero' && ball && ball.row === row && ball.col === col) ||
           (mode === 'place_ball' && hero && hero.row === row && hero.col === col);
         if (blocked) {
