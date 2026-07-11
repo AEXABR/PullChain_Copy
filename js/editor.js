@@ -67,13 +67,21 @@ function placeCrate(row, col) {
     return;
   }
   const key = K(row, col);
+  let crate;
   if (!crates.has(key)) {
-    crates.set(key, new Crate(row, col, editor.currentCrateKey));
+    crate = new Crate(row, col, editor.currentCrateKey);
+    crates.set(key, crate);
   } else if (!crates.has(key + ':1')) {
-    crates.set(key + ':1', new Crate(row, col, editor.currentCrateKey));
+    crate = new Crate(row, col, editor.currentCrateKey);
+    crates.set(key + ':1', crate);
   } else {
     statusEl.textContent = '⚠ 此处已有两个箱子！';
     return;
+  }
+  // 飞蛾初始高度：手动计算后锁定（后续 updateEntityHeight 会跳过）
+  if (crate.crateKey === 'moth') {
+    const under = entityUnder(row, col, crate);
+    crate.height = under ? under.height + under.selfHeight : tileFootLevel(row, col);
   }
   const type = CRATES[editor.currentCrateKey];
   updateAllHeights();
