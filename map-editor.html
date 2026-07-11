@@ -373,7 +373,6 @@
       if (!ball) return true;
       if (dist(hero.row, hero.col, ball.row, ball.col) <= 1) return true;
 
-      const savedCrates = snapshotCrates();
       const prevBallRow = ball.row, prevBallCol = ball.col;
       const dr = Math.sign(prevRow - ball.row);
       const dc = Math.sign(prevCol - ball.col);
@@ -401,33 +400,35 @@
         candidates.push({ row: ball.row, col: diagCol, pushDr: 0,  pushDc: dc });
       }
 
-      let ballMoved = false;
+      const isValid = (c) =>
+        c.row >= 0 && c.row < GRID_SIZE && c.col >= 0 && c.col < GRID_SIZE &&
+        dist(hero.row, hero.col, c.row, c.col) <= 1;
+
+      // 第一轮：尝试推箱子移动
       for (const c of candidates) {
-        if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
-        if (dist(hero.row, hero.col, c.row, c.col) > 1) continue;
+        if (!isValid(c)) continue;
         const chain = getPushChain(c.row, c.col, c.pushDr, c.pushDc);
-        if (!chain || chain.length === 0) continue;
-        pushChain(chain, c.pushDr, c.pushDc);
-        ball.row = c.row;
-        ball.col = c.col;
-        ballMoved = true;
-        break;
-      }
-      if (!ballMoved) {
-        for (const c of candidates) {
-          if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
-          if (isSolid(c.row, c.col)) continue;
-          if (dist(hero.row, hero.col, c.row, c.col) > 1) continue;
-          ball.row = c.row;
-          ball.col = c.col;
-          ballMoved = true;
+        if (chain && chain.length > 0) {
+          pushChain(chain, c.pushDr, c.pushDc);
+          ball.row = c.row; ball.col = c.col;
           break;
         }
       }
 
+      // 第二轮：推不动则尝试纯移动（不推箱子）
+      if (dist(hero.row, hero.col, ball.row, ball.col) > 1) {
+        for (const c of candidates) {
+          if (!isValid(c)) continue;
+          if (!isSolid(c.row, c.col)) {
+            ball.row = c.row; ball.col = c.col;
+            break;
+          }
+        }
+      }
+
+      // 距离守卫：仍然太远则恢复球位置
       if (dist(hero.row, hero.col, ball.row, ball.col) > 1) {
         ball.row = prevBallRow; ball.col = prevBallCol;
-        restoreCrates(savedCrates);
         return false;
       }
       return true;
