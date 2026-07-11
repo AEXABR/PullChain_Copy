@@ -769,23 +769,24 @@
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
+      const x0 = x + s, y0 = y + s, w = s * 6;
 
       // 水面底色
       ctx.fillStyle = '#3377aa';
-      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      ctx.fillRect(x0, y0, w, w);
       // 深浅波纹
       ctx.fillStyle = '#4499cc';
-      ctx.fillRect(x + 0, y + s * 1, TILE_SIZE, s);
-      ctx.fillRect(x + 0, y + s * 3, TILE_SIZE, s);
-      ctx.fillRect(x + 0, y + s * 5, TILE_SIZE, s);
+      ctx.fillRect(x0, y0 + s * 1, w, s);
+      ctx.fillRect(x0, y0 + s * 3, w, s);
+      ctx.fillRect(x0, y0 + s * 5, w, s);
       // 高光波峰
       ctx.fillStyle = '#66bbee';
-      ctx.fillRect(x + 2, y + s * 2, TILE_SIZE - 4, s);
-      ctx.fillRect(x + 2, y + s * 6, TILE_SIZE - 4, s);
+      ctx.fillRect(x0 + 2, y0 + s * 2, w - 4, s);
+      ctx.fillRect(x0 + 2, y0 + s * 6 - 2, w - 4, s);
       // 像素边框
       ctx.strokeStyle = '#2266aa';
       ctx.lineWidth = 1;
-      ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+      ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, w - 1);
     }
 
     function drawWebTile(row, col) {
@@ -1009,7 +1010,7 @@
     function render() {
       ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-      // 1. 绘制所有格子（墙、水、空地）
+      // 1. 绘制所有格子（墙、空地/蜘蛛网底，水覆盖叠在上面）
       for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
           if (grid[r][c] === T_WALL) {
@@ -1019,12 +1020,14 @@
             } else {
               drawWallTile(r, c);
             }
-          } else if (waterTiles.has(K(r, c))) {
-            drawWaterTile(r, c);
           } else if (webTiles.has(K(r, c))) {
             drawWebTile(r, c);
           } else {
             drawEmptyTile(r, c);
+          }
+          // 水覆盖（叠在非墙格子上方，与蜘蛛网共存）
+          if (grid[r][c] !== T_WALL && waterTiles.has(K(r, c))) {
+            drawWaterTile(r, c);
           }
         }
       }
