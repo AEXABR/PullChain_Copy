@@ -782,6 +782,7 @@
       }
       setTile(row, col, T_WALL);
       diagCorners.set(K(row, col), currentDiagCorner);
+      render(); // setTile内部render时diagCorners还未设置，需补渲染一次
       statusEl.textContent = `${DIAG_SYMBOLS[currentDiagCorner]} 斜角墙(${currentDiagCorner}缺口)已放置`;
     }
 
