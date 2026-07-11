@@ -125,22 +125,6 @@
     }
     function isSolid(r, c)     { return grid[r][c] === T_WALL || crateAt(r, c) !== null; }
 
-    // 尝试推箱子：只沿指定方向推，被挡则失败。返回是否成功
-    function tryPushCrate(crate, pushDr, pushDc) {
-      const pr = crate.row + pushDr;
-      const pc = crate.col + pushDc;
-      if (pr >= 0 && pr < GRID_SIZE && pc >= 0 && pc < GRID_SIZE &&
-          grid[pr][pc] === T_EMPTY && !crateAt(pr, pc) &&
-          !(hero && hero.row === pr && hero.col === pc)) {
-        crates.delete(`${crate.row},${crate.col}`);
-        crate.row = pr;
-        crate.col = pc;
-        crates.set(`${pr},${pc}`, crate);
-        return true;
-      }
-      return false;
-    }
-
     // 链式推动：从(r,c)沿(dr,dc)扫描，返回可推动的实体链。null=阻塞
     function getPushChain(r, c, dr, dc) {
       const chain = [];
@@ -151,6 +135,21 @@
         if (!ent) return chain;
         chain.push(ent);
         r += dr; c += dc;
+      }
+    }
+
+    // 执行链式推动：从后往前移动chain中所有实体（crate同步更新Map key）
+    function pushChain(chain, dr, dc) {
+      for (let i = chain.length - 1; i >= 0; i--) {
+        const ent = chain[i];
+        const newR = ent.row + dr, newC = ent.col + dc;
+        if (ent instanceof Crate) {
+          crates.delete(`${ent.row},${ent.col}`);
+          ent.row = newR; ent.col = newC;
+          crates.set(`${newR},${newC}`, ent);
+        } else {
+          ent.row = newR; ent.col = newC;
+        }
       }
     }
 
@@ -365,7 +364,7 @@
       const dist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
       if (dist <= 1) return true;
 
-      // 快照crates：diagOk检查中tryPushCrate可能移动箱子，失败时需整体回滚
+      // 快照crates：diagOk/推箱可能移动箱子，失败时需整体回滚
       const savedCrates = new Map();
       for (const [k, v] of crates) savedCrates.set(k, new Crate(v.row, v.col, v.crateKey));
       const prevBallRow = ball.row, prevBallCol = ball.col;
@@ -379,13 +378,15 @@
       if (!diagOk) {
         const c1r = diagRow, c1c = ball.col;
         const c2r = ball.row, c2c = diagCol;
-        const c1crate = crateAt(c1r, c1c);
-        const c2crate = crateAt(c2r, c2c);
-        const c1clear = grid[c1r] && (!isSolid(c1r, c1c) ||
-          (c1crate && tryPushCrate(c1crate, dr, 0)));
-        const c2clear = grid[c2r] && (!isSolid(c2r, c2c) ||
-          (c2crate && tryPushCrate(c2crate, 0, dc)));
-        diagOk = c1clear && c2clear;
+        const c1chain = getPushChain(c1r, c1c, dr, 0);
+        const c2chain = getPushChain(c2r, c2c, 0, dc);
+        const c1clear = grid[c1r] && (!isSolid(c1r, c1c) || c1chain !== null);
+        const c2clear = grid[c2r] && (!isSolid(c2r, c2c) || c2chain !== null);
+        if (c1clear && c2clear) {
+          if (c1chain) pushChain(c1chain, dr, 0);
+          if (c2chain) pushChain(c2chain, 0, dc);
+          diagOk = true;
+        }
       }
       if (diagOk) candidates.push({ row: diagRow, col: diagCol, pushDr: dr, pushDc: dc });
       if (dr !== 0 && dc !== 0) {
@@ -398,14 +399,13 @@
         if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
         const d = Math.max(Math.abs(hero.row - c.row), Math.abs(hero.col - c.col));
         if (d > 1) continue;
-        const crate = crateAt(c.row, c.col);
-        if (!crate) continue;
-        if (tryPushCrate(crate, c.pushDr, c.pushDc)) {
-          ball.row = c.row;
-          ball.col = c.col;
-          ballMoved = true;
-          break;
-        }
+        const chain = getPushChain(c.row, c.col, c.pushDr, c.pushDc);
+        if (!chain || chain.length === 0) continue;
+        pushChain(chain, c.pushDr, c.pushDc);
+        ball.row = c.row;
+        ball.col = c.col;
+        ballMoved = true;
+        break;
       }
       if (!ballMoved) {
         for (const c of candidates) {
@@ -478,18 +478,8 @@
           for (const [k, v] of crates) savedCrates.set(k, new Crate(v.row, v.col, v.crateKey));
           const savedBallRow = ball ? ball.row : null, savedBallCol = ball ? ball.col : null;
 
-          // 从后往前移动实体链（避免覆盖）
-          for (let i = chain.length - 1; i >= 0; i--) {
-            const ent = chain[i];
-            const newR = ent.row + dir.dr, newC = ent.col + dir.dc;
-            if (ent instanceof Crate) {
-              crates.delete(`${ent.row},${ent.col}`);
-              ent.row = newR; ent.col = newC;
-              crates.set(`${newR},${newC}`, ent);
-            } else {
-              ent.row = newR; ent.col = newC;
-            }
-          }
+          // 从后往前移动实体链
+          pushChain(chain, dir.dr, dir.dc);
 
           // 移动主角
           hero.row = nr; hero.col = nc;
