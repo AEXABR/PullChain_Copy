@@ -348,9 +348,9 @@
       if (!diagOk) {
         const c1r = diagRow, c1c = ball.col;
         const c2r = ball.row, c2c = diagCol;
-        const c1clear = grid[c1r] && (grid[c1r][c1c] === T_EMPTY ||
+        const c1clear = grid[c1r] && (!isSolid(grid[c1r][c1c]) ||
           (isCrate(grid[c1r][c1c]) && tryPushCrate(grid[c1r][c1c], c1r, c1c, dr, 0)));
-        const c2clear = grid[c2r] && (grid[c2r][c2c] === T_EMPTY ||
+        const c2clear = grid[c2r] && (!isSolid(grid[c2r][c2c]) ||
           (isCrate(grid[c2r][c2c]) && tryPushCrate(grid[c2r][c2c], c2r, c2c, 0, dc)));
         diagOk = c1clear && c2clear;
       }
@@ -376,7 +376,7 @@
       if (!ballMoved) {
         for (const c of candidates) {
           if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
-          if (grid[c.row][c.col] !== T_EMPTY) continue;
+          if (isSolid(grid[c.row][c.col])) continue;
           const d = Math.max(Math.abs(hero.row - c.row), Math.abs(hero.col - c.col));
           if (d > 1) continue;
           ball = c;
