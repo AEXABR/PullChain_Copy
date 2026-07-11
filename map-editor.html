@@ -104,7 +104,7 @@
 
     // === 实体类 ===
     class Entity {
-      constructor(row, col) { this.row = row; this.col = col; this.height = 0; }
+      constructor(row, col) { this.row = row; this.col = col; this.height = 0; this.selfHeight = 1; }
     }
     class Hero  extends Entity {}
     class Ball  extends Entity {
@@ -571,13 +571,14 @@
       if (webTiles.has(K(hero.row, hero.col))) return false; // 被蜘蛛网困住
       const nr = hero.row + dr, nc = hero.col + dc;
 
-      // 边界 / 墙检查（升降墙上升态高度为1，主角在同一高度可站上去）
+      // 边界 / 墙检查（升降墙可站上：主角脚底高度 >= 墙顶高度）
       if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return false;
-      if (grid[nr][nc] === T_WALL && !(liftWalls.has(K(nr, nc)) && hero.height >= 1)) return false;
+      const targetFoot = tileFootLevel(nr, nc);
+      if (grid[nr][nc] === T_WALL && !(liftWalls.has(K(nr, nc)) && hero.height >= targetFoot)) return false;
 
-      // 主角高度高于目标实体时，站到同格上方（不推动）
+      // 主角高度 >= 目标实体顶面（脚底+自身高度）→ 站到同格上方（不推动）
       const targetEnt = entityAt(nr, nc);
-      if (targetEnt && hero.height > targetEnt.height) {
+      if (targetEnt && hero.height >= targetEnt.height + targetEnt.selfHeight) {
         const prevRow = hero.row, prevCol = hero.col;
         hero.row = nr; hero.col = nc;
         if (!followBall(prevRow, prevCol)) {
@@ -587,7 +588,7 @@
         return true;
       }
 
-      // 站上升降墙（墙上升态高度1，主角同高度可站上）
+      // 站上升降墙（墙顶高度 = tileFootLevel，主角同高度可站上）
       if (grid[nr][nc] === T_WALL && liftWalls.has(K(nr, nc))) {
         const prevRow = hero.row, prevCol = hero.col;
         hero.row = nr; hero.col = nc;
@@ -632,15 +633,22 @@
       return null;
     }
 
-    // 更新单个实体逻辑高度：升降墙上→1，站在别的实体上→底高+1，空地→0
+    // 格子脚底高度 = 格子基础高度(暂0) + 升降墙上升态加成(1)
+    function tileFootLevel(r, c) {
+      let level = 0; // 格子基础高度（未来可扩展：洼地=-1等）
+      if (liftWalls.has(K(r, c)) && grid[r][c] === T_WALL) level += 1;
+      return level;
+    }
+
+    // 更新单个实体脚底高度：格子高度，或站在别的实体上→底高+该实体自身高度
     function updateEntityHeight(ent) {
       if (!ent) return;
       const r = ent.row, c = ent.col;
-      if (liftWalls.has(K(r, c)) && grid[r][c] === T_WALL) {
-        ent.height = 1;
+      const under = entityUnder(r, c, ent);
+      if (under) {
+        ent.height = under.height + under.selfHeight;
       } else {
-        const under = entityUnder(r, c, ent);
-        ent.height = under ? under.height + 1 : 0;
+        ent.height = tileFootLevel(r, c);
       }
     }
 
