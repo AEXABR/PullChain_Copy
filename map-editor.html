@@ -770,8 +770,6 @@
       const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
 
-      // 半透明水贴图 — 不盖住地面纹理
-      ctx.globalAlpha = 0.55;
       // 水面底色
       ctx.fillStyle = '#3377aa';
       ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
@@ -788,19 +786,20 @@
       ctx.strokeStyle = '#2266aa';
       ctx.lineWidth = 1;
       ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
-      ctx.globalAlpha = 1;
     }
 
-    function drawWebTile(row, col) {
+    function drawWebTile(row, col, skipBg) {
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
       const cx = x + TILE_SIZE / 2;
       const cy = y + TILE_SIZE / 2;
 
-      // 空地底色
-      ctx.fillStyle = '#3a3a4e';
-      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      if (!skipBg) {
+        // 空地底色
+        ctx.fillStyle = '#3a3a4e';
+        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      }
 
       // 八角辐射蛛丝
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
@@ -1012,9 +1011,18 @@
     function render() {
       ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-      // 1. 绘制所有格子（墙、空地/蜘蛛网底，水覆盖叠在上面）
+      // 1. 水在最底层
       for (let r = 0; r < GRID_SIZE; r++) {
         for (let c = 0; c < GRID_SIZE; c++) {
+          if (grid[r][c] !== T_WALL && waterTiles.has(K(r, c))) {
+            drawWaterTile(r, c);
+          }
+        }
+      }
+      // 2. 绘制格子（墙、蜘蛛网、空地，有水的格子不画底色）
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          const hasWater = waterTiles.has(K(r, c));
           if (grid[r][c] === T_WALL) {
             const corner = diagCorners.get(K(r, c));
             if (corner) {
@@ -1023,13 +1031,9 @@
               drawWallTile(r, c);
             }
           } else if (webTiles.has(K(r, c))) {
-            drawWebTile(r, c);
-          } else {
+            drawWebTile(r, c, hasWater);
+          } else if (!hasWater) {
             drawEmptyTile(r, c);
-          }
-          // 水覆盖（叠在非墙格子上方，与蜘蛛网共存）
-          if (grid[r][c] !== T_WALL && waterTiles.has(K(r, c))) {
-            drawWaterTile(r, c);
           }
         }
       }
