@@ -98,21 +98,14 @@
     const T_WALL  = 1;
 
     // === 箱子注册表（扩展新箱子只需在这里加一项） ===
-    const T_WATER = 5;
-
     const CRATES = {
       wood: { id: 2, name: '木箱', emoji: '📦', pushable: true },
       snow: { id: 3, name: '雪块', emoji: '❄️', pushable: true },
     };
 
     // 工具函数
-    function isSolid(v)  { return v !== T_EMPTY && v !== T_WATER; }
-    function isCrate(v)  {
-      for (const key of Object.keys(CRATES)) {
-        if (CRATES[key].id === v) return true;
-      }
-      return false;
-    }
+    function isSolid(v)  { return v !== T_EMPTY; }
+    function isCrate(v)  { return v >= 2; }
     function crateById(id) {
       for (const key of Object.keys(CRATES)) {
         if (CRATES[key].id === id) return CRATES[key];
@@ -154,6 +147,7 @@
     let ball = null;            // {row, col} | null
     let ballOn = true;          // 球形态：true=开灯(亮黄), false=关灯(灰色)
     let currentCrateKey = 'wood'; // 当前选中的箱子类型
+    let waterTiles = new Set();  // 有水贴图的空地坐标 "row,col"
     let isDrawing = false;      // 鼠标拖拽中
     let hoverCell = null;       // {row, col} | null  鼠标悬停格子
 
@@ -322,6 +316,7 @@
       ball = null;
       ballOn = true;
       currentCrateKey = 'wood';
+      waterTiles.clear();
       updateCrateBtn();
       statusEl.textContent = '🗺 地图已清空';
       render();
@@ -402,7 +397,8 @@
           if (grid[r][c] === CRATES.snow.id) {
             const dist = Math.max(Math.abs(ball.row - r), Math.abs(ball.col - c));
             if (dist <= 1) {
-              grid[r][c] = T_WATER;
+              grid[r][c] = T_EMPTY;
+              waterTiles.add(`${r},${c}`);
             }
           }
         }
@@ -818,7 +814,7 @@
             drawWallTile(r, c);
           } else if (isCrate(grid[r][c])) {
             drawCrateTile(r, c, grid[r][c]);
-          } else if (grid[r][c] === T_WATER) {
+          } else if (waterTiles.has(`${r},${c}`)) {
             drawWaterTile(r, c);
           } else {
             drawEmptyTile(r, c);
