@@ -43,18 +43,22 @@ const DIAG_CORNERS = ['TL', 'TR', 'BL', 'BR'];
 const DIAG_SYMBOLS = { TL: '◤', TR: '◥', BL: '◣', BR: '◢' };
 
 // === 状态 ===
-let mode = 'wall';          // 'wall' | 'erase' | 'place_hero' | 'place_ball' | 'play' | ...
+// 编辑器 UI 状态
+const editor = {
+  mode: 'wall',             // 'wall'|'erase'|'place_hero'|'place_ball'|'play'|...
+  currentCrateKey: 'wood',  // 当前选中的箱子类型
+  currentDiagCorner: 'TL',  // 当前斜角墙缺口朝向
+  currentLiftType: 'up',    // 当前升降墙放置类型
+  isDrawing: false,         // 鼠标拖拽中
+  hoverCell: null,          // {row, col} | null  鼠标悬停格子
+  wireStart: null,          // 引线模式：选中的踏板key
+};
+// 游戏逻辑状态
 let grid = [];              // grid[row][col]: Tile 对象
 let hero = null;            // Hero | null
 let ball = null;            // Ball | null
 const crates = new Map();   // "row,col" -> Crate
-let currentCrateKey = 'wood'; // 当前选中的箱子类型
-let currentDiagCorner = 'TL'; // 当前斜角墙缺口朝向
-let currentLiftType = 'up';   // 当前放置类型
-const wireLinks = [];         // [{plate: "r,c", wall: "r,c"}, ...]
-let wireStart = null;         // 引线模式：选中的踏板key
-let isDrawing = false;        // 鼠标拖拽中
-let hoverCell = null;         // {row, col} | null  鼠标悬停格子
+const wireLinks = [];       // [{plate: "r,c", wall: "r,c"}, ...]
 
 // === 状态初始化 ===
 function initGrid() {

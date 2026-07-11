@@ -317,13 +317,13 @@ function drawWires() {
     ctx.lineTo(wx, wy);
     ctx.stroke();
   }
-  if (mode === 'wire' && wireStart) {
-    const [sr, sc] = wireStart.split(',').map(Number);
+  if (editor.mode === 'wire' && editor.wireStart) {
+    const [sr, sc] = editor.wireStart.split(',').map(Number);
     const sx = sc * TILE_SIZE + TILE_SIZE / 2;
     const sy = sr * TILE_SIZE + TILE_SIZE / 2;
-    if (hoverCell) {
-      const hx = hoverCell.col * TILE_SIZE + TILE_SIZE / 2;
-      const hy = hoverCell.row * TILE_SIZE + TILE_SIZE / 2;
+    if (editor.hoverCell) {
+      const hx = editor.hoverCell.col * TILE_SIZE + TILE_SIZE / 2;
+      const hy = editor.hoverCell.row * TILE_SIZE + TILE_SIZE / 2;
       ctx.strokeStyle = 'rgba(255, 220, 50, 0.35)';
       ctx.setLineDash([3, 3]);
       ctx.beginPath();
@@ -483,15 +483,15 @@ function render() {
   drawGridLines();
 
   // 8. 悬停高亮
-  if ((mode === 'place_hero' || mode === 'place_ball' || mode === 'place_crate' || mode === 'web' || mode === 'plate' || mode === 'liftwall') && hoverCell) {
-    const { row, col } = hoverCell;
+  if ((editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall') && editor.hoverCell) {
+    const { row, col } = editor.hoverCell;
     const x = col * TILE_SIZE;
     const y = row * TILE_SIZE;
     const tile = grid[row][col];
-    const blocked = (mode === 'web' || mode === 'plate' || mode === 'liftwall')
+    const blocked = (editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall')
       ? tile.base === T_WALL
-      : mode === 'wire'
-      ? !wireStart ? !tile.isPlate
+      : editor.mode === 'wire'
+      ? !editor.wireStart ? !tile.isPlate
         : tile.liftWall === null
       : tile.base === T_WALL && tile.liftWall === null;
     if (blocked) {

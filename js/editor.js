@@ -42,7 +42,7 @@ function setTile(row, col, value) {
         wireLinks.splice(i, 1);
       }
     }
-    if (wireStart === key) wireStart = null;
+    if (editor.wireStart === key) editor.wireStart = null;
   }
   if (grid[row][col].base === value) return;
   grid[row][col].base = value;
@@ -55,9 +55,9 @@ function placeDiagWall(row, col) {
     // 允许覆盖已有的斜角墙（更改缺口朝向）或普通墙（升级为斜角墙）
   }
   setTile(row, col, T_WALL);
-  grid[row][col].diagCorner = currentDiagCorner;
+  grid[row][col].diagCorner = editor.currentDiagCorner;
   render();
-  statusEl.textContent = `${DIAG_SYMBOLS[currentDiagCorner]} 斜角墙(${currentDiagCorner}缺口)已放置`;
+  statusEl.textContent = `${DIAG_SYMBOLS[editor.currentDiagCorner]} 斜角墙(${editor.currentDiagCorner}缺口)已放置`;
 }
 
 function placeCrate(row, col) {
@@ -68,14 +68,14 @@ function placeCrate(row, col) {
   }
   const key = K(row, col);
   if (!crates.has(key)) {
-    crates.set(key, new Crate(row, col, currentCrateKey));
+    crates.set(key, new Crate(row, col, editor.currentCrateKey));
   } else if (!crates.has(key + ':1')) {
-    crates.set(key + ':1', new Crate(row, col, currentCrateKey));
+    crates.set(key + ':1', new Crate(row, col, editor.currentCrateKey));
   } else {
     statusEl.textContent = '⚠ 此处已有两个箱子！';
     return;
   }
-  const type = CRATES[currentCrateKey];
+  const type = CRATES[editor.currentCrateKey];
   updateAllHeights();
   statusEl.textContent = `${type.emoji} ${type.name}已放置`;
   render();
@@ -108,12 +108,12 @@ function placeLiftWall(row, col) {
     statusEl.textContent = '⚠ 此处已有墙体或升降墙！';
     return;
   }
-  tile.liftWall = currentLiftType;
-  if (currentLiftType === 'down') {
+  tile.liftWall = editor.currentLiftType;
+  if (editor.currentLiftType === 'down') {
     tile.base = T_WALL;
   }
   render();
-  const typeLabel = currentLiftType === 'up' ? '上升型(默认下降)' : '下降型(默认升起)';
+  const typeLabel = editor.currentLiftType === 'up' ? '上升型(默认下降)' : '下降型(默认升起)';
   statusEl.textContent = `⇅ 升降墙已放置(${typeLabel})`;
 }
 
@@ -162,27 +162,27 @@ function getCellFromEvent(e) {
 }
 
 function handleCanvasDown(e) {
-  if (mode === 'play') return;
-  isDrawing = true;
+  if (editor.mode === 'play') return;
+  editor.isDrawing = true;
   const cell = getCellFromEvent(e);
   if (!cell) return;
 
-  if (mode === 'wire') {
+  if (editor.mode === 'wire') {
     const key = K(cell.row, cell.col);
     if (grid[cell.row][cell.col].isPlate) {
-      wireStart = key;
+      editor.wireStart = key;
       statusEl.textContent = `🔗 已选踏板(${key}) — 点击升降墙完成连线`;
       render();
       return;
     }
-    if (grid[cell.row][cell.col].liftWall !== null && wireStart) {
-      wireLinks.push({ plate: wireStart, wall: key });
-      statusEl.textContent = `🔗 引线已连接: ${wireStart} → ${key}`;
-      wireStart = null;
+    if (grid[cell.row][cell.col].liftWall !== null && editor.wireStart) {
+      wireLinks.push({ plate: editor.wireStart, wall: key });
+      statusEl.textContent = `🔗 引线已连接: ${editor.wireStart} → ${key}`;
+      editor.wireStart = null;
       render();
       return;
     }
-    wireStart = null;
+    editor.wireStart = null;
     statusEl.textContent = '模式: 引线 — 点击踏板然后点击升降墙连线';
     render();
     return;
@@ -199,19 +199,19 @@ function handleCanvasDown(e) {
     plate:       () => placePlate(cell.row, cell.col),
     liftwall:    () => placeLiftWall(cell.row, cell.col),
   };
-  if (placeActions[mode]) placeActions[mode]();
+  if (placeActions[editor.mode]) placeActions[editor.mode]();
 }
 
 function handleCanvasMove(e) {
   const cell = getCellFromEvent(e);
-  hoverCell = cell;
+  editor.hoverCell = cell;
 
-  if (mode === 'place_hero' || mode === 'place_ball' || mode === 'place_crate' || mode === 'web' || mode === 'plate' || mode === 'liftwall' || mode === 'wire') {
+  if (editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall' || editor.mode === 'wire') {
     render();
     return;
   }
 
-  if (!isDrawing) return;
+  if (!editor.isDrawing) return;
   if (!cell) return;
 
   const dragActions = {
@@ -222,11 +222,11 @@ function handleCanvasMove(e) {
     plate:    () => placePlate(cell.row, cell.col),
     liftwall: () => placeLiftWall(cell.row, cell.col),
   };
-  if (dragActions[mode]) dragActions[mode]();
+  if (dragActions[editor.mode]) dragActions[editor.mode]();
 }
 
 function handleCanvasUp() {
-  isDrawing = false;
+  editor.isDrawing = false;
 }
 
 canvas.addEventListener('mousedown', handleCanvasDown);
@@ -234,26 +234,26 @@ canvas.addEventListener('mousemove', handleCanvasMove);
 canvas.addEventListener('mouseup', handleCanvasUp);
 canvas.addEventListener('mouseleave', () => {
   handleCanvasUp();
-  hoverCell = null;
+  editor.hoverCell = null;
   render();
 });
 
 // === 模式切换 ===
 function setMode(newMode) {
-  isDrawing = false;
-  mode = newMode;
+  editor.isDrawing = false;
+  editor.mode = newMode;
   allBtns.forEach(b => b.classList.remove('active'));
 
   const modeLabels = {
     'wall':        '模式: 画墙 — 点击/拖拽画布放置墙体',
-    'diag':        `模式: 画斜角墙(${DIAG_SYMBOLS[currentDiagCorner]}缺口) — 点击/拖拽画布放置`,
+    'diag':        `模式: 画斜角墙(${DIAG_SYMBOLS[editor.currentDiagCorner]}缺口) — 点击/拖拽画布放置`,
     'erase':       '模式: 擦除 — 点击/拖拽画布清除墙体或箱子',
     'place_hero':  '模式: 放置角色 — 点击空地放置角色',
     'place_ball':  '模式: 放置球 — 点击空地放置球（不能和角色/箱子同格）',
-    'place_crate': `模式: 放置${CRATES[currentCrateKey].name} — 点击空地放置`,
+    'place_crate': `模式: 放置${CRATES[editor.currentCrateKey].name} — 点击空地放置`,
     'web':         '模式: 蜘蛛网 — 点击/拖拽在空地上放置蜘蛛网',
     'plate':       '模式: 踏板 — 点击空地放置踏板',
-    'liftwall':    `模式: 升降墙(${currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`,
+    'liftwall':    `模式: 升降墙(${editor.currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`,
     'wire':        '模式: 引线 — 点击踏板然后点击升降墙连线',
     'play':        '模式: 操控 — 方向键/WASD 移动角色'
   };
@@ -265,47 +265,47 @@ function setMode(newMode) {
   activeBtns[newMode].classList.add('active');
   if (newMode === 'place_crate') updateCrateBtn();
   if (newMode === 'diag') updateDiagBtn();
-  if (newMode === 'wire') wireStart = null;
+  if (newMode === 'wire') editor.wireStart = null;
   if (newMode === 'liftwall') updateLiftBtn();
   statusEl.textContent = modeLabels[newMode];
   render();
 }
 
 function updateCrateBtn() {
-  const type = CRATES[currentCrateKey];
+  const type = CRATES[editor.currentCrateKey];
   btnCrate.textContent = `${type.emoji} ${type.name} [6]`;
 }
 
 function updateDiagBtn() {
-  btnDiag.textContent = `${DIAG_SYMBOLS[currentDiagCorner]} 斜角墙 [7]`;
+  btnDiag.textContent = `${DIAG_SYMBOLS[editor.currentDiagCorner]} 斜角墙 [7]`;
 }
 
 function updateLiftBtn() {
-  btnLiftwall.textContent = currentLiftType === 'up' ? '⇅ 升墙(↑) [0]' : '⇅ 降墙(↓) [0]';
+  btnLiftwall.textContent = editor.currentLiftType === 'up' ? '⇅ 升墙(↑) [0]' : '⇅ 降墙(↓) [0]';
 }
 
 // 按钮点击：切换模式 / 循环切换子类型
 document.querySelectorAll('#toolbar button[data-mode]').forEach(b =>
   b.addEventListener('click', () => {
-    if (b.dataset.mode === 'place_crate' && mode === 'place_crate') {
+    if (b.dataset.mode === 'place_crate' && editor.mode === 'place_crate') {
       const keys = Object.keys(CRATES);
-      const idx = keys.indexOf(currentCrateKey);
-      currentCrateKey = keys[(idx + 1) % keys.length];
+      const idx = keys.indexOf(editor.currentCrateKey);
+      editor.currentCrateKey = keys[(idx + 1) % keys.length];
       updateCrateBtn();
-      statusEl.textContent = `模式: 放置${CRATES[currentCrateKey].name} — 点击空地放置`;
+      statusEl.textContent = `模式: 放置${CRATES[editor.currentCrateKey].name} — 点击空地放置`;
       return;
     }
-    if (b.dataset.mode === 'diag' && mode === 'diag') {
-      const idx = DIAG_CORNERS.indexOf(currentDiagCorner);
-      currentDiagCorner = DIAG_CORNERS[(idx + 1) % DIAG_CORNERS.length];
+    if (b.dataset.mode === 'diag' && editor.mode === 'diag') {
+      const idx = DIAG_CORNERS.indexOf(editor.currentDiagCorner);
+      editor.currentDiagCorner = DIAG_CORNERS[(idx + 1) % DIAG_CORNERS.length];
       updateDiagBtn();
-      statusEl.textContent = `模式: 画斜角墙(${DIAG_SYMBOLS[currentDiagCorner]}缺口) — 点击/拖拽画布放置`;
+      statusEl.textContent = `模式: 画斜角墙(${DIAG_SYMBOLS[editor.currentDiagCorner]}缺口) — 点击/拖拽画布放置`;
       return;
     }
-    if (b.dataset.mode === 'liftwall' && mode === 'liftwall') {
-      currentLiftType = currentLiftType === 'up' ? 'down' : 'up';
+    if (b.dataset.mode === 'liftwall' && editor.mode === 'liftwall') {
+      editor.currentLiftType = editor.currentLiftType === 'up' ? 'down' : 'up';
       updateLiftBtn();
-      statusEl.textContent = `模式: 升降墙(${currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`;
+      statusEl.textContent = `模式: 升降墙(${editor.currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`;
       return;
     }
     setMode(b.dataset.mode);
@@ -370,9 +370,9 @@ function clearMap() {
   hero = null;
   ball = null;
   crates.clear();
-  currentCrateKey = 'wood';
+  editor.currentCrateKey = 'wood';
   wireLinks.length = 0;
-  wireStart = null;
+  editor.wireStart = null;
   updateCrateBtn();
   statusEl.textContent = '🗺 地图已清空';
   render();
@@ -393,7 +393,7 @@ document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
   if (KEY_MODE[e.key]) { setMode(KEY_MODE[e.key]); return; }
 
-  if (mode === 'play' && hero) {
+  if (editor.mode === 'play' && hero) {
     const dir = KEY_DIR[e.key];
     if (dir) {
       e.preventDefault();
