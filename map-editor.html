@@ -769,24 +769,26 @@
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
-      const x0 = x + s, y0 = y + s, w = s * 6;
 
+      // 半透明水贴图 — 不盖住地面纹理
+      ctx.globalAlpha = 0.55;
       // 水面底色
       ctx.fillStyle = '#3377aa';
-      ctx.fillRect(x0, y0, w, w);
+      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
       // 深浅波纹
       ctx.fillStyle = '#4499cc';
-      ctx.fillRect(x0, y0 + s * 1, w, s);
-      ctx.fillRect(x0, y0 + s * 3, w, s);
-      ctx.fillRect(x0, y0 + s * 5, w, s);
+      ctx.fillRect(x + 0, y + s * 1, TILE_SIZE, s);
+      ctx.fillRect(x + 0, y + s * 3, TILE_SIZE, s);
+      ctx.fillRect(x + 0, y + s * 5, TILE_SIZE, s);
       // 高光波峰
       ctx.fillStyle = '#66bbee';
-      ctx.fillRect(x0 + 2, y0 + s * 2, w - 4, s);
-      ctx.fillRect(x0 + 2, y0 + s * 6 - 2, w - 4, s);
+      ctx.fillRect(x + 2, y + s * 2, TILE_SIZE - 4, s);
+      ctx.fillRect(x + 2, y + s * 6, TILE_SIZE - 4, s);
       // 像素边框
       ctx.strokeStyle = '#2266aa';
       ctx.lineWidth = 1;
-      ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, w - 1);
+      ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+      ctx.globalAlpha = 1;
     }
 
     function drawWebTile(row, col) {
