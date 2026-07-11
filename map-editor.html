@@ -855,54 +855,56 @@
     // === 箱子 ===
     function drawCrateTile(crate) {
       const row = crate.row, col = crate.col;
+      const stacked = entityUnder(row, col, crate) !== null; // 堆叠在其他实体上
+      const inset = stacked ? 3 : 2; // 平常内缩2圈，堆叠再缩1圈
       if (crate.crateKey === 'snow') {
-        drawSnowTile(row, col);
+        drawSnowTile(row, col, inset);
         return;
       }
-      // 默认木箱（内缩一圈，和角色/球一致）
+      // 木箱
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
-      const x0 = x + s, y0 = y + s, w = s * 6;
+      const x0 = x + s * inset, y0 = y + s * inset, w = s * (8 - inset * 2);
 
       // 木箱底色
       ctx.fillStyle = '#8B6914';
       ctx.fillRect(x0, y0, w, w);
-      // 木板横纹
-      ctx.fillStyle = '#7A5C10';
-      ctx.fillRect(x0 + 2, y0 + s * 1, w - 4, 2);
-      ctx.fillRect(x0 + 2, y0 + s * 2, w - 4, 2);
-      ctx.fillRect(x0 + 2, y0 + s * 3, w - 4, 2);
-      ctx.fillRect(x0 + 2, y0 + s * 4, w - 4, 2);
-      ctx.fillRect(x0 + 2, y0 + s * 5, w - 4, 2);
+      // 木板横纹（按比例缩放）
+      const rows = Math.max(2, Math.floor(w / s));
+      for (let i = 0; i < rows - 1; i++) {
+        ctx.fillStyle = '#7A5C10';
+        ctx.fillRect(x0 + 2, y0 + s * i + s / 2, w - 4, Math.max(1, s / 4));
+      }
       // 十字绑带
       ctx.strokeStyle = '#A0792B';
-      ctx.lineWidth = 2;
+      ctx.lineWidth = 1.5;
       ctx.beginPath();
-      ctx.moveTo(x0 + 3, y0 + w / 2);
-      ctx.lineTo(x0 + w - 3, y0 + w / 2);
+      ctx.moveTo(x0 + 2, y0 + w / 2);
+      ctx.lineTo(x0 + w - 2, y0 + w / 2);
       ctx.stroke();
       ctx.beginPath();
-      ctx.moveTo(x0 + w / 2, y0 + 3);
-      ctx.lineTo(x0 + w / 2, y0 + w - 3);
+      ctx.moveTo(x0 + w / 2, y0 + 2);
+      ctx.lineTo(x0 + w / 2, y0 + w - 2);
       ctx.stroke();
-      // 铁钉（四角）
+      // 铁钉（四角，按比例缩放）
+      const nail = Math.max(1, Math.floor(w / 8));
       ctx.fillStyle = '#555555';
-      ctx.fillRect(x0 + 3, y0 + 3, 3, 3);
-      ctx.fillRect(x0 + w - 6, y0 + 3, 3, 3);
-      ctx.fillRect(x0 + 3, y0 + w - 6, 3, 3);
-      ctx.fillRect(x0 + w - 6, y0 + w - 6, 3, 3);
+      ctx.fillRect(x0 + 2, y0 + 2, nail, nail);
+      ctx.fillRect(x0 + w - 2 - nail, y0 + 2, nail, nail);
+      ctx.fillRect(x0 + 2, y0 + w - 2 - nail, nail, nail);
+      ctx.fillRect(x0 + w - 2 - nail, y0 + w - 2 - nail, nail, nail);
       // 边框
       ctx.strokeStyle = '#6B4F12';
       ctx.lineWidth = 1;
       ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, w - 1);
     }
 
-    function drawSnowTile(row, col) {
+    function drawSnowTile(row, col, inset = 2) {
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
-      const x0 = x + s, y0 = y + s, w = s * 6;
+      const x0 = x + s * inset, y0 = y + s * inset, w = s * (8 - inset * 2);
 
       // 雪白底色
       ctx.fillStyle = '#d8e8f0';
@@ -910,15 +912,10 @@
       // 冰蓝暗角
       ctx.fillStyle = '#b8d4e8';
       ctx.fillRect(x0 + 2, y0 + 2, w - 4, w - 4);
-      // 冰晶纹理（菱形高光，相对内缩区域）
-      ctx.fillStyle = '#eef8ff';
-      ctx.fillRect(x0 + s * 2, y0 + s * 0, s * 2, s * 2);
-      ctx.fillRect(x0 + s * 0, y0 + s * 2, s * 2, s * 2);
-      ctx.fillRect(x0 + s * 4, y0 + s * 2, s * 2, s * 2);
-      ctx.fillRect(x0 + s * 2, y0 + s * 4, s * 2, s * 2);
       // 雪花中心
       ctx.fillStyle = '#ffffff';
-      ctx.fillRect(x0 + s * 2, y0 + s * 2, s * 2, s * 2);
+      const cx = x0 + w / 2, cy = y0 + w / 2, r = w / 4;
+      ctx.fillRect(cx - r / 2, cy - r / 2, r, r);
       // 冰蓝边框
       ctx.strokeStyle = '#8ab8d0';
       ctx.lineWidth = 1;
