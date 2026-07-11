@@ -380,6 +380,7 @@
       const diagRow = ball.row + dr;
       const diagCol = ball.col + dc;
 
+      let diagCorner = null; // { c1chain, c2chain } — 拐角待推链，延迟到对角移动提交时执行
       let diagOk = dr === 0 || dc === 0;
       if (!diagOk) {
         const c1r = diagRow, c1c = ball.col;
@@ -389,12 +390,11 @@
         const c1clear = grid[c1r] && (!isSolid(c1r, c1c) || c1chain !== null);
         const c2clear = grid[c2r] && (!isSolid(c2r, c2c) || c2chain !== null);
         if (c1clear && c2clear) {
-          if (c1chain) pushChain(c1chain, dr, 0);
-          if (c2chain) pushChain(c2chain, 0, dc);
           diagOk = true;
+          diagCorner = { c1chain, c2chain };
         }
       }
-      if (diagOk) candidates.push({ row: diagRow, col: diagCol, pushDr: dr, pushDc: dc });
+      if (diagOk) candidates.push({ row: diagRow, col: diagCol, pushDr: dr, pushDc: dc, corner: diagCorner });
       if (dr !== 0 && dc !== 0) {
         candidates.push({ row: diagRow, col: ball.col, pushDr: dr, pushDc: 0 });
         candidates.push({ row: ball.row, col: diagCol, pushDr: 0,  pushDc: dc });
@@ -408,11 +408,22 @@
       for (const c of candidates) {
         if (!isValid(c)) continue;
         const chain = getPushChain(c.row, c.col, c.pushDr, c.pushDc);
-        if (chain && chain.length > 0) {
-          pushChain(chain, c.pushDr, c.pushDc);
-          ball.row = c.row; ball.col = c.col;
-          break;
+        // 对角移动需拐角箱子也要推（或目标格有箱子）；轴对齐只需目标格有箱子
+        const needsCorner = c.corner && (c.corner.c1chain || c.corner.c2chain);
+        const needsPush = chain && chain.length > 0;
+        if (!needsCorner && !needsPush) continue; // 无可推之物，留给第二轮纯移动
+
+        // 目标格不可达（墙/OOB）→ 跳过
+        if (chain === null) continue;
+
+        // 提交：拐角推 → 目标链推 → 移动球
+        if (needsCorner) {
+          if (c.corner.c1chain) pushChain(c.corner.c1chain, dr, 0);
+          if (c.corner.c2chain) pushChain(c.corner.c2chain, 0, dc);
         }
+        if (needsPush) pushChain(chain, c.pushDr, c.pushDc);
+        ball.row = c.row; ball.col = c.col;
+        break;
       }
 
       // 第二轮：推不动则尝试纯移动（不推箱子）
