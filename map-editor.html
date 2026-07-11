@@ -124,16 +124,17 @@
     // 工具函数
     const K = (r, c) => `${r},${c}`;
     const dist = (r1, c1, r2, c2) => Math.max(Math.abs(r1 - r2), Math.abs(c1 - c2));
-    function crateAt(r, c)     { return crates.get(K(r, c)) || null; }
+    function crateAt(r, c)     { return crates.get(K(r, c) + ':1') || crates.get(K(r, c)) || null; } // 优先返回上层箱子
+    function cratesAt(r, c)    { const a = []; const b = crates.get(K(r, c)); if (b) a.push(b); const t = crates.get(K(r, c) + ':1'); if (t) a.push(t); return a; }
     function entityAt(r, c) {
       if (hero && hero.row === r && hero.col === c) return hero;
       if (ball && ball.row === r && ball.col === c) return ball;
       return crateAt(r, c);
     }
-    // entityForPush: 推链专用，排除主角（主角是推者不被推，且不能挡住脚下实体）
+    // entityForPush: 推链专用，排除主角。箱子取底层（上层跟随移动）
     function entityForPush(r, c) {
       if (ball && ball.row === r && ball.col === c) return ball;
-      return crateAt(r, c);
+      return crates.get(K(r, c)) || crates.get(K(r, c) + ':1') || null;
     }
     function isSolid(r, c)     { return grid[r][c] === T_WALL || crateAt(r, c) !== null; }
 
@@ -163,15 +164,26 @@
       }
     }
 
-    // 执行链式推动：从后往前移动chain中所有实体（crate同步更新Map key）
+    // 执行链式推动：从后往前移动chain中所有实体（crate同步更新Map key，叠箱同移）
     function pushChain(chain, dr, dc) {
       for (let i = chain.length - 1; i >= 0; i--) {
         const ent = chain[i];
         const newR = ent.row + dr, newC = ent.col + dc;
         if (ent instanceof Crate) {
-          crates.delete(K(ent.row, ent.col));
+          const oldKey = K(ent.row, ent.col);
+          const stackedKey = oldKey + ':1';
+          const stacked = crates.get(stackedKey); // 同格上层箱子
+          // 删除旧位置
+          crates.delete(oldKey);
+          if (stacked) crates.delete(stackedKey);
+          // 移动到底层
           ent.row = newR; ent.col = newC;
           crates.set(K(newR, newC), ent);
+          // 上层箱子跟随
+          if (stacked) {
+            stacked.row = newR; stacked.col = newC;
+            crates.set(K(newR, newC) + ':1', stacked);
+          }
         } else {
           ent.row = newR; ent.col = newC;
         }
@@ -249,6 +261,7 @@
           statusEl.textContent = '⚠ 球被覆盖，已移除球';
         } else if (ent instanceof Crate) {
           crates.delete(K(row, col));
+          crates.delete(K(row, col) + ':1');
         }
         waterTiles.delete(K(row, col));
         webTiles.delete(K(row, col));
@@ -641,6 +654,9 @@
     }
     // 返回(r,c)处除self外的实体（用于判断脚下堆叠）。高度更低或在同高度下层序更低才算脚下
     function entityUnder(r, c, self) {
+      // 同格双箱：上层箱子脚下是下层箱子
+      const allCrates = cratesAt(r, c);
+      if (allCrates.length === 2 && allCrates[1] === self) return allCrates[0];
       const check = (ent) => {
         if (!ent || ent === self || ent.row !== r || ent.col !== c) return false;
         return ent.height < self.height ||
@@ -1119,12 +1135,16 @@
         statusEl.textContent = '⚠ 不能把箱子放在墙体上！';
         return;
       }
-      if (crateAt(row, col)) {
-        statusEl.textContent = '⚠ 此处已有箱子！';
+      const key = K(row, col);
+      if (!crates.has(key)) {
+        crates.set(key, new Crate(row, col, currentCrateKey));
+      } else if (!crates.has(key + ':1')) {
+        crates.set(key + ':1', new Crate(row, col, currentCrateKey));
+      } else {
+        statusEl.textContent = '⚠ 此处已有两个箱子！';
         return;
       }
       const type = CRATES[currentCrateKey];
-      crates.set(K(row, col), new Crate(row, col, currentCrateKey));
       updateAllHeights();
       statusEl.textContent = `${type.emoji} ${type.name}已放置`;
       render();
