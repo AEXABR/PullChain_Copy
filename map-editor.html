@@ -575,6 +575,18 @@
       if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return false;
       if (grid[nr][nc] === T_WALL) return false;
 
+      // 主角高度高于目标实体时，站到同格上方（不推动）
+      const targetEnt = entityAt(nr, nc);
+      if (targetEnt && hero.height > targetEnt.height) {
+        const prevRow = hero.row, prevCol = hero.col;
+        hero.row = nr; hero.col = nc;
+        if (!followBall(prevRow, prevCol)) {
+          hero.row = prevRow; hero.col = prevCol;
+          return false;
+        }
+        return true;
+      }
+
       // 链式推动扫描
       const chain = getPushChain(nr, nc, dr, dc);
       if (chain === null) return false;
