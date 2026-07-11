@@ -797,11 +797,7 @@
       const cx = x + TILE_SIZE / 2;
       const cy = y + TILE_SIZE / 2;
 
-      // 空地底色
-      ctx.fillStyle = '#3a3a4e';
-      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-
-      // 八角辐射蛛丝
+      // 八角辐射蛛丝（不填底色，叠在空地/水上）
       ctx.strokeStyle = 'rgba(255, 255, 255, 0.45)';
       ctx.lineWidth = 1;
       const dirs = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
