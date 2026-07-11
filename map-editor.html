@@ -750,7 +750,7 @@
     // === 球 ===
     function drawBall(ball) {
       const x = ball.col * TILE_SIZE;
-      const y = ball.row * TILE_SIZE - ball.height * TILE_SIZE;
+      const y = ball.row * TILE_SIZE;
       const s = TILE_SIZE / 8;
 
       if (ball.lightOn) {
@@ -823,12 +823,12 @@
     function drawCrateTile(crate) {
       const row = crate.row, col = crate.col;
       if (crate.crateKey === 'snow') {
-        drawSnowTile(row, col, crate.height);
+        drawSnowTile(row, col);
         return;
       }
       // 默认木箱（内缩一圈，和角色/球一致）
       const x = col * TILE_SIZE;
-      const y = row * TILE_SIZE - crate.height * TILE_SIZE;
+      const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
       const x0 = x + s, y0 = y + s, w = s * 6;
 
@@ -865,9 +865,9 @@
       ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, w - 1);
     }
 
-    function drawSnowTile(row, col, height) {
+    function drawSnowTile(row, col) {
       const x = col * TILE_SIZE;
-      const y = row * TILE_SIZE - (height || 0) * TILE_SIZE;
+      const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
       const x0 = x + s, y0 = y + s, w = s * 6;
 
@@ -1134,7 +1134,7 @@
       const hx = hero.col * TILE_SIZE + TILE_SIZE / 2;
       const hy = hero.row * TILE_SIZE + TILE_SIZE / 2;
       const bx = ball.col * TILE_SIZE + TILE_SIZE / 2;
-      const by = ball.row * TILE_SIZE + TILE_SIZE / 2 - ball.height * TILE_SIZE;
+      const by = ball.row * TILE_SIZE + TILE_SIZE / 2;
 
       // 绳子底色（深色轮廓）
       ctx.strokeStyle = '#5a4a32';
