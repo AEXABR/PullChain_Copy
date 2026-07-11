@@ -156,7 +156,7 @@
         if (ent && webTiles.has(K(r, c))) return null;
         if (!ent) return chain;
         // 推动者（或链中上一实体）可站到该实体上方 → 不推，返回当前链
-        if (stepHeight >= ent.height + ent.selfHeight) return chain;
+        if (stepHeight > ent.height + ent.selfHeight) return chain;
         chain.push(ent);
         stepHeight = ent.height; // 被推实体的当前脚底高度传给下一格判定
         r += dr; c += dc;
@@ -558,7 +558,7 @@
         for (const c of candidates) {
           if (!isValid(c)) continue;
           const ent = entityForPush(c.row, c.col);
-          const canStep = !ent || ball.height >= ent.height + ent.selfHeight;
+          const canStep = !ent || ball.height > ent.height + ent.selfHeight;
           if (canStep && grid[c.row][c.col] !== T_WALL) {
             ball.row = c.row; ball.col = c.col;
             break;
@@ -584,9 +584,9 @@
       const targetFoot = tileFootLevel(nr, nc);
       if (grid[nr][nc] === T_WALL && !(liftWalls.has(K(nr, nc)) && hero.height >= targetFoot)) return false;
 
-      // 主角高度 >= 目标实体顶面（脚底+自身高度）→ 站到同格上方（不推动）
+      // 主角高度 > 目标实体顶面（脚底+自身高度）→ 站到同格上方（不推动）
       const targetEnt = entityAt(nr, nc);
-      if (targetEnt && hero.height >= targetEnt.height + targetEnt.selfHeight) {
+      if (targetEnt && hero.height > targetEnt.height + targetEnt.selfHeight) {
         const prevRow = hero.row, prevCol = hero.col;
         hero.row = nr; hero.col = nc;
         if (!followBall(prevRow, prevCol)) {
