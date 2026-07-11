@@ -571,13 +571,24 @@
       if (webTiles.has(K(hero.row, hero.col))) return false; // 被蜘蛛网困住
       const nr = hero.row + dr, nc = hero.col + dc;
 
-      // 边界 / 墙检查
+      // 边界 / 墙检查（升降墙上升态高度为1，主角在同一高度可站上去）
       if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return false;
-      if (grid[nr][nc] === T_WALL) return false;
+      if (grid[nr][nc] === T_WALL && !(liftWalls.has(K(nr, nc)) && hero.height >= 1)) return false;
 
       // 主角高度高于目标实体时，站到同格上方（不推动）
       const targetEnt = entityAt(nr, nc);
       if (targetEnt && hero.height > targetEnt.height) {
+        const prevRow = hero.row, prevCol = hero.col;
+        hero.row = nr; hero.col = nc;
+        if (!followBall(prevRow, prevCol)) {
+          hero.row = prevRow; hero.col = prevCol;
+          return false;
+        }
+        return true;
+      }
+
+      // 站上升降墙（墙上升态高度1，主角同高度可站上）
+      if (grid[nr][nc] === T_WALL && liftWalls.has(K(nr, nc))) {
         const prevRow = hero.row, prevCol = hero.col;
         hero.row = nr; hero.col = nc;
         if (!followBall(prevRow, prevCol)) {
@@ -625,7 +636,7 @@
     function updateEntityHeight(ent) {
       if (!ent) return;
       const r = ent.row, c = ent.col;
-      if (liftWalls.has(K(r, c))) {
+      if (liftWalls.has(K(r, c)) && grid[r][c] === T_WALL) {
         ent.height = 1;
       } else {
         const under = entityUnder(r, c, ent);
