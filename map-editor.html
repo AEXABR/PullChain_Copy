@@ -602,8 +602,7 @@
 
     // 升降墙更新：检查踏板，按类型决定升降
     function updateLiftWalls() {
-      // 为每个升降墙收集其连接的所有踏板
-      const wallPlates = new Map(); // wallKey → Set of plateKeys
+      const wallPlates = new Map();
       for (const wkey of liftWalls.keys()) {
         wallPlates.set(wkey, new Set());
       }
@@ -612,7 +611,6 @@
           wallPlates.get(link.wall).add(link.plate);
         }
       }
-      // 判断每个墙的状态（所有连接的踏板都被踩下，且至少有1个连接）
       for (const [wkey, plates] of wallPlates) {
         const [wr, wc] = wkey.split(',').map(Number);
         const allPressed = plates.size > 0 && [...plates].every(pk => {
@@ -621,35 +619,11 @@
         });
         const type = liftWalls.get(wkey) || 'up';
         if (type === 'up') {
-          // 上升型：踏板全踩下 → 升起
-          if (allPressed) {
-            if (grid[wr][wc] !== T_WALL) {
-              grid[wr][wc] = T_WALL;
-              const ent = entityAt(wr, wc);
-              if (ent) ent.height++;
-            }
-          } else {
-            if (grid[wr][wc] === T_WALL) {
-              const ent = entityAt(wr, wc);
-              if (ent && ent.height > 0) ent.height--;
-              grid[wr][wc] = T_EMPTY;
-            }
-          }
+          if (allPressed) grid[wr][wc] = T_WALL;
+          else grid[wr][wc] = T_EMPTY;
         } else {
-          // 下降型：踏板全踩下 → 下降
-          if (allPressed) {
-            if (grid[wr][wc] === T_WALL) {
-              const ent = entityAt(wr, wc);
-              if (ent && ent.height > 0) ent.height--;
-              grid[wr][wc] = T_EMPTY;
-            }
-          } else {
-            if (grid[wr][wc] !== T_WALL) {
-              grid[wr][wc] = T_WALL;
-              const ent = entityAt(wr, wc);
-              if (ent) ent.height++;
-            }
-          }
+          if (allPressed) grid[wr][wc] = T_EMPTY;
+          else grid[wr][wc] = T_WALL;
         }
       }
     }
@@ -1119,8 +1093,6 @@
       liftWalls.set(key, currentLiftType);
       if (currentLiftType === 'down') {
         grid[row][col] = T_WALL;
-        const ent = entityAt(row, col);
-        if (ent) ent.height++;
       }
       render();
       const typeLabel = currentLiftType === 'up' ? '上升型(默认下降)' : '下降型(默认升起)';
