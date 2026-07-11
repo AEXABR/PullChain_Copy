@@ -767,16 +767,12 @@
     }
 
     function placeHero(row, col) {
-      if (isSolid(row, col)) {
-        statusEl.textContent = '⚠ 不能把角色放在墙体或箱子上！';
-        return;
-      }
-      if (ball && ball.row === row && ball.col === col) {
-        statusEl.textContent = '⚠ 不能把角色放在球上！';
+      if (grid[row][col] === T_WALL && !liftWalls.has(K(row, col))) {
+        statusEl.textContent = '⚠ 不能把角色放在墙体上！';
         return;
       }
       hero = new Hero(row, col);
-      // 如果球还没放，自动切换到放球模式
+      updateAllHeights();
       if (!ball) {
         setMode('place_ball');
         statusEl.textContent = '✅ 角色已放置！现在请放置球';
@@ -845,15 +841,12 @@
     }
 
     function placeBall(row, col) {
-      if (isSolid(row, col)) {
-        statusEl.textContent = '⚠ 不能把球放在墙体或箱子上！';
-        return;
-      }
-      if (hero && hero.row === row && hero.col === col) {
-        statusEl.textContent = '⚠ 不能把球放在角色上！';
+      if (grid[row][col] === T_WALL && !liftWalls.has(K(row, col))) {
+        statusEl.textContent = '⚠ 不能把球放在墙体上！';
         return;
       }
       ball = new Ball(row, col);
+      updateAllHeights();
       setMode('play');
       statusEl.textContent = '✅ 球已放置！方向键/WASD 移动角色';
       render();
@@ -1113,20 +1106,17 @@
     }
 
     function placeCrate(row, col) {
-      if (isSolid(row, col)) {
-        statusEl.textContent = '⚠ 此处已被占用！';
+      if (grid[row][col] === T_WALL && !liftWalls.has(K(row, col))) {
+        statusEl.textContent = '⚠ 不能把箱子放在墙体上！';
         return;
       }
-      if (hero && hero.row === row && hero.col === col) {
-        statusEl.textContent = '⚠ 角色在此处！';
-        return;
-      }
-      if (ball && ball.row === row && ball.col === col) {
-        statusEl.textContent = '⚠ 球在此处！';
+      if (crateAt(row, col)) {
+        statusEl.textContent = '⚠ 此处已有箱子！';
         return;
       }
       const type = CRATES[currentCrateKey];
       crates.set(K(row, col), new Crate(row, col, currentCrateKey));
+      updateAllHeights();
       statusEl.textContent = `${type.emoji} ${type.name}已放置`;
       render();
     }
@@ -1375,9 +1365,7 @@
           : mode === 'wire'
           ? !wireStart ? !plateTiles.has(K(row, col))
             : !liftWalls.has(K(row, col))
-          : isSolid(row, col) ||
-            (mode === 'place_hero' && ball && ball.row === row && ball.col === col) ||
-            (mode === 'place_ball' && hero && hero.row === row && hero.col === col);
+          : grid[row][col] === T_WALL && !liftWalls.has(K(row, col));
         if (blocked) {
           ctx.fillStyle = 'rgba(255, 60, 60, 0.4)';
         } else {
