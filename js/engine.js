@@ -312,7 +312,10 @@ function moveMoths() {
       // 不在同一行或同一列 → 停止
       if (row !== ball.row && col !== ball.col) break;
 
-      // 检查视线（中间有墙/升降墙 → 停止）
+      // 飞蛾只能看到同一高度的灯球
+      if (height !== ball.height) break;
+
+      // 检查视线（中间有墙/实体 → 停止）
       if (!hasLineOfSight(row, col, ball.row, ball.col)) break;
 
       // 计算方向
