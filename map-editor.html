@@ -632,12 +632,24 @@
       return true;
     }
 
-    // 返回(r,c)处除self外的实体（用于判断脚下堆叠）
+    // 实体层序：Hero(3) > Ball(2) > Crate(1)（渲染顺序同）
+    function entityPriority(ent) {
+      if (ent instanceof Hero) return 3;
+      if (ent instanceof Ball) return 2;
+      if (ent instanceof Crate) return 1;
+      return 0;
+    }
+    // 返回(r,c)处除self外的实体（用于判断脚下堆叠）。高度更低或在同高度下层序更低才算脚下
     function entityUnder(r, c, self) {
-      if (ball && ball !== self && ball.row === r && ball.col === c) return ball;
-      if (hero && hero !== self && hero.row === r && hero.col === c) return hero;
+      const check = (ent) => {
+        if (!ent || ent === self || ent.row !== r || ent.col !== c) return false;
+        return ent.height < self.height ||
+              (ent.height === self.height && entityPriority(ent) < entityPriority(self));
+      };
+      if (check(ball))   return ball;
+      if (check(hero))   return hero;
       const crate = crateAt(r, c);
-      if (crate && crate !== self) return crate;
+      if (check(crate))  return crate;
       return null;
     }
 
