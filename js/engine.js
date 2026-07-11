@@ -295,51 +295,55 @@ function moveMoths() {
   const moths = [];
   for (const [key, crate] of crates) {
     if (crate.crateKey === 'moth' && !key.endsWith(':1')) {
-      moths.push({ key, crate });
+      moths.push(crate);
     }
   }
 
-  for (const { key, crate } of moths) {
-    // 飞蛾可能已被其他操作移除（如融化导致底层消失？不会影响飞蛾）
-    if (!crates.has(key)) continue;
+  for (const crate of moths) {
+    // 持续飞行直到到达球旁或被阻断
+    while (true) {
+      // 球关灯 → 停止
+      if (!ball || !ball.lightOn) break;
 
-    const { row, col, height } = crate;
+      const { row, col, height } = crate;
 
-    // 不在同一行或同一列
-    if (row !== ball.row && col !== ball.col) continue;
+      // 不在同一行或同一列 → 停止
+      if (row !== ball.row && col !== ball.col) break;
 
-    // 检查视线
-    if (!hasLineOfSight(row, col, ball.row, ball.col)) continue;
+      // 检查视线（中间有墙/升降墙 → 停止）
+      if (!hasLineOfSight(row, col, ball.row, ball.col)) break;
 
-    // 计算方向
-    const dr = Math.sign(ball.row - row);
-    const dc = Math.sign(ball.col - col);
+      // 计算方向
+      const dr = Math.sign(ball.row - row);
+      const dc = Math.sign(ball.col - col);
 
-    // 已与球重合
-    if (dr === 0 && dc === 0) continue;
+      // 已到达球旁边（与球同行/同列且相邻即重合）
+      if (dr === 0 && dc === 0) break;
 
-    const nr = row + dr;
-    const nc = col + dc;
+      const nr = row + dr;
+      const nc = col + dc;
 
-    // 越界检查
-    if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
+      // 越界
+      if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) break;
 
-    // 目标格是墙 → 挡住
-    if (grid[nr][nc].base === T_WALL) continue;
+      // 目标格是墙 → 挡住
+      if (grid[nr][nc].base === T_WALL) break;
 
-    // 目标格有实体且顶面高于飞蛾 → 挡住
-    const destEnt = entityAt(nr, nc);
-    if (destEnt && destEnt.height + destEnt.selfHeight > height) continue;
+      // 目标格有实体且顶面高于飞蛾 → 挡住
+      const destEnt = entityAt(nr, nc);
+      if (destEnt && destEnt.height + destEnt.selfHeight > height) break;
 
-    // 目标格已有底层箱子 → 不堆叠，挡住
-    if (crates.has(K(nr, nc))) continue;
+      // 目标格已有底层箱子 → 挡住
+      if (crates.has(K(nr, nc))) break;
 
-    // 移动飞蛾：更新 crates Map
-    crates.delete(key);
-    crate.row = nr;
-    crate.col = nc;
-    crates.set(K(nr, nc), crate);
-    // 高度不变（飞蛾特性）
+      // 移动一格
+      const oldKey = K(row, col);
+      crates.delete(oldKey);
+      crate.row = nr;
+      crate.col = nc;
+      crates.set(K(nr, nc), crate);
+      // 高度不变（飞蛾特性），继续循环
+    }
   }
 }
 
