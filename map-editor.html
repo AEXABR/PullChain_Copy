@@ -147,6 +147,7 @@
     let grid = [];              // grid[row][col]: 0=空地, 1=墙体, >=2=箱子(见CRATES)
     let hero = null;            // {row, col} | null
     let ball = null;            // {row, col} | null
+    let ballOn = true;          // 球形态：true=开灯(亮黄), false=关灯(灰色)
     let isDrawing = false;      // 鼠标拖拽中
     let hoverCell = null;       // {row, col} | null  鼠标悬停格子
 
@@ -296,6 +297,7 @@
       }
       hero = null;
       ball = null;
+      ballOn = true;
       statusEl.textContent = '🗺 地图已清空';
       render();
     }
@@ -408,6 +410,8 @@
               grid[cr][cc] = T_EMPTY;
               grid[nr][nc] = crateType;
               hero = { row, col };
+              ballOn = !ballOn;
+              render();
               return;
             }
           // 推球
@@ -423,12 +427,14 @@
             hero = { row: nr, col: nc };
             if (!followBall(row, col)) {
               hero = { row, col };
+              ballOn = !ballOn;
+              render();
               return;
             }
           }
 
           statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +
-            (ball ? `  球位置: (${ball.row}, ${ball.col})` : '') +
+            (ball ? `  球位置: (${ball.row}, ${ball.col}) [${ballOn ? '💡开' : '🌑关'}]` : '') +
             (ball ? `  距离: ${Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col))}` : '');
           render();
         }
@@ -491,28 +497,55 @@
       const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
 
-      // 外发光
-      const cx = x + TILE_SIZE / 2;
-      const cy = y + TILE_SIZE / 2;
-      const grad = ctx.createRadialGradient(cx, cy, s * 1, cx, cy, s * 3.5);
-      grad.addColorStop(0, 'rgba(255, 255, 100, 0.9)');
-      grad.addColorStop(0.5, 'rgba(255, 200, 30, 0.5)');
-      grad.addColorStop(1, 'rgba(255, 150, 0, 0)');
-      ctx.fillStyle = grad;
-      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      if (ballOn) {
+        // === 开灯形态：亮黄色发光球 ===
+        // 外发光
+        const cx = x + TILE_SIZE / 2;
+        const cy = y + TILE_SIZE / 2;
+        const grad = ctx.createRadialGradient(cx, cy, s * 1, cx, cy, s * 3.5);
+        grad.addColorStop(0, 'rgba(255, 255, 100, 0.9)');
+        grad.addColorStop(0.5, 'rgba(255, 200, 30, 0.5)');
+        grad.addColorStop(1, 'rgba(255, 150, 0, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
 
-      // 球体（亮黄圆）
-      ctx.fillStyle = '#ffee44';
-      ctx.fillRect(x + s * 1, y + s * 1, s * 6, s * 6);
+        // 球体（亮黄圆）
+        ctx.fillStyle = '#ffee44';
+        ctx.fillRect(x + s * 1, y + s * 1, s * 6, s * 6);
 
-      // 高光
-      ctx.fillStyle = '#ffffaa';
-      ctx.fillRect(x + s * 2, y + s * 2, s * 3, s * 2);
+        // 高光
+        ctx.fillStyle = '#ffffaa';
+        ctx.fillRect(x + s * 2, y + s * 2, s * 3, s * 2);
 
-      // 像素边框
-      ctx.strokeStyle = '#ccaa00';
-      ctx.lineWidth = 1;
-      ctx.strokeRect(x + s * 1 + 0.5, y + s * 1 + 0.5, s * 6 - 1, s * 6 - 1);
+        // 像素边框
+        ctx.strokeStyle = '#ccaa00';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + s * 1 + 0.5, y + s * 1 + 0.5, s * 6 - 1, s * 6 - 1);
+      } else {
+        // === 关灯形态：灰色暗球 ===
+        // 微弱暗光
+        const cx = x + TILE_SIZE / 2;
+        const cy = y + TILE_SIZE / 2;
+        const grad = ctx.createRadialGradient(cx, cy, s * 1, cx, cy, s * 3.5);
+        grad.addColorStop(0, 'rgba(100, 100, 100, 0.4)');
+        grad.addColorStop(0.5, 'rgba(80, 80, 80, 0.2)');
+        grad.addColorStop(1, 'rgba(60, 60, 60, 0)');
+        ctx.fillStyle = grad;
+        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+        // 球体（灰色）
+        ctx.fillStyle = '#888888';
+        ctx.fillRect(x + s * 1, y + s * 1, s * 6, s * 6);
+
+        // 暗高光
+        ctx.fillStyle = '#aaaaaa';
+        ctx.fillRect(x + s * 2, y + s * 2, s * 3, s * 2);
+
+        // 像素边框
+        ctx.strokeStyle = '#666666';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + s * 1 + 0.5, y + s * 1 + 0.5, s * 6 - 1, s * 6 - 1);
+      }
     }
 
     function placeBall(row, col) {
