@@ -98,16 +98,21 @@
     const T_WALL  = 1;
 
     // === 箱子注册表（扩展新箱子只需在这里加一项） ===
+    const T_WATER = 5;
+
     const CRATES = {
       wood: { id: 2, name: '木箱', emoji: '📦', pushable: true },
-      // 未来变种示例:
-      // iron:  { id: 3, name: '铁箱', emoji: '🔩', pushable: false },
-      // bomb:  { id: 4, name: '炸弹', emoji: '💣', pushable: true },
+      snow: { id: 3, name: '雪块', emoji: '❄️', pushable: true },
     };
 
     // 工具函数
-    function isSolid(v)  { return v !== T_EMPTY; }
-    function isCrate(v)  { return v >= 2; }
+    function isSolid(v)  { return v !== T_EMPTY && v !== T_WATER; }
+    function isCrate(v)  {
+      for (const key of Object.keys(CRATES)) {
+        if (CRATES[key].id === v) return true;
+      }
+      return false;
+    }
     function crateById(id) {
       for (const key of Object.keys(CRATES)) {
         if (CRATES[key].id === id) return CRATES[key];
@@ -148,6 +153,7 @@
     let hero = null;            // {row, col} | null
     let ball = null;            // {row, col} | null
     let ballOn = true;          // 球形态：true=开灯(亮黄), false=关灯(灰色)
+    let currentCrateKey = 'wood'; // 当前选中的箱子类型
     let isDrawing = false;      // 鼠标拖拽中
     let hoverCell = null;       // {row, col} | null  鼠标悬停格子
 
@@ -248,7 +254,7 @@
         'erase':       '模式: 擦除 — 点击/拖拽画布清除墙体或箱子',
         'place_hero':  '模式: 放置角色 — 点击空地放置角色',
         'place_ball':  '模式: 放置球 — 点击空地放置球（不能和角色/箱子同格）',
-        'place_crate': '模式: 放置箱子 — 点击空地放置箱子',
+        'place_crate': `模式: 放置${CRATES[currentCrateKey].name} — 点击空地放置`,
         'play':        '模式: 操控 — 方向键/WASD 移动角色'
       };
       const activeBtns = {
@@ -257,12 +263,29 @@
       };
 
       activeBtns[newMode].classList.add('active');
+      if (newMode === 'place_crate') updateCrateBtn();
       statusEl.textContent = modeLabels[newMode];
       render();
     }
 
+    function updateCrateBtn() {
+      const type = CRATES[currentCrateKey];
+      btnCrate.textContent = `${type.emoji} ${type.name} [6]`;
+    }
+
     document.querySelectorAll('#toolbar button[data-mode]').forEach(b =>
-      b.addEventListener('click', () => setMode(b.dataset.mode)));
+      b.addEventListener('click', () => {
+        if (b.dataset.mode === 'place_crate' && mode === 'place_crate') {
+          // 已在箱子模式则循环切换箱子类型
+          const keys = Object.keys(CRATES);
+          const idx = keys.indexOf(currentCrateKey);
+          currentCrateKey = keys[(idx + 1) % keys.length];
+          updateCrateBtn();
+          statusEl.textContent = `模式: 放置${CRATES[currentCrateKey].name} — 点击空地放置`;
+          return;
+        }
+        setMode(b.dataset.mode);
+      })));
 
     // === 导出 ===
     function exportMap() {
@@ -298,6 +321,8 @@
       hero = null;
       ball = null;
       ballOn = true;
+      currentCrateKey = 'wood';
+      updateCrateBtn();
       statusEl.textContent = '🗺 地图已清空';
       render();
     }
@@ -369,6 +394,21 @@
       return true;
     }
 
+    // 融化雪块：球开灯时，周围8格内的雪块融化为水
+    function meltSnow() {
+      if (!ball || !ballOn) return;
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          if (grid[r][c] === CRATES.snow.id) {
+            const dist = Math.max(Math.abs(ball.row - r), Math.abs(ball.col - c));
+            if (dist <= 1) {
+              grid[r][c] = T_WATER;
+            }
+          }
+        }
+      }
+    }
+
     // 键盘映射
     const KEY_DIR = {
       'ArrowUp':{dr:-1,dc:0},'w':{dr:-1,dc:0},'W':{dr:-1,dc:0},
@@ -433,6 +473,7 @@
             }
           }
 
+          meltSnow();
           statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +
             (ball ? `  球位置: (${ball.row}, ${ball.col}) [${ballOn ? '💡开' : '🌑关'}]` : '') +
             (ball ? `  距离: ${Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col))}` : '');
@@ -564,7 +605,12 @@
     }
 
     // === 箱子 ===
-    function drawCrateTile(row, col, _crateId) {
+    function drawCrateTile(row, col, crateId) {
+      if (crateId === CRATES.snow.id) {
+        drawSnowTile(row, col);
+        return;
+      }
+      // 默认木箱
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
       // 木箱底色
@@ -599,6 +645,55 @@
       ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
     }
 
+    function drawSnowTile(row, col) {
+      const x = col * TILE_SIZE;
+      const y = row * TILE_SIZE;
+      const s = TILE_SIZE / 8;
+
+      // 雪白底色
+      ctx.fillStyle = '#d8e8f0';
+      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      // 冰蓝暗角
+      ctx.fillStyle = '#b8d4e8';
+      ctx.fillRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4);
+      // 冰晶纹理（菱形高光）
+      ctx.fillStyle = '#eef8ff';
+      ctx.fillRect(x + s * 3, y + s * 1, s * 2, s * 2);
+      ctx.fillRect(x + s * 1, y + s * 3, s * 2, s * 2);
+      ctx.fillRect(x + s * 5, y + s * 3, s * 2, s * 2);
+      ctx.fillRect(x + s * 3, y + s * 5, s * 2, s * 2);
+      // 雪花中心
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(x + s * 3, y + s * 3, s * 2, s * 2);
+      // 冰蓝边框
+      ctx.strokeStyle = '#8ab8d0';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+    }
+
+    function drawWaterTile(row, col) {
+      const x = col * TILE_SIZE;
+      const y = row * TILE_SIZE;
+      const s = TILE_SIZE / 8;
+
+      // 水面底色
+      ctx.fillStyle = '#3377aa';
+      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      // 深浅波纹
+      ctx.fillStyle = '#4499cc';
+      ctx.fillRect(x + 0, y + s * 1, TILE_SIZE, s);
+      ctx.fillRect(x + 0, y + s * 3, TILE_SIZE, s);
+      ctx.fillRect(x + 0, y + s * 5, TILE_SIZE, s);
+      // 高光波峰
+      ctx.fillStyle = '#66bbee';
+      ctx.fillRect(x + 2, y + s * 2, TILE_SIZE - 4, s);
+      ctx.fillRect(x + 2, y + s * 6, TILE_SIZE - 4, s);
+      // 像素边框
+      ctx.strokeStyle = '#2266aa';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+    }
+
     function placeCrate(row, col, crateKey) {
       if (isSolid(grid[row][col])) {
         statusEl.textContent = '⚠ 此处已被占用！';
@@ -612,7 +707,7 @@
         statusEl.textContent = '⚠ 球在此处！';
         return;
       }
-      const type = CRATES[crateKey || 'wood'];
+      const type = CRATES[crateKey || currentCrateKey];
       grid[row][col] = type.id;
       statusEl.textContent = `${type.emoji} ${type.name}已放置`;
       render();
@@ -723,6 +818,8 @@
             drawWallTile(r, c);
           } else if (isCrate(grid[r][c])) {
             drawCrateTile(r, c, grid[r][c]);
+          } else if (grid[r][c] === T_WATER) {
+            drawWaterTile(r, c);
           } else {
             drawEmptyTile(r, c);
           }
