@@ -9,10 +9,11 @@ const btnWeb = document.getElementById('btn-web');
 const btnPlate = document.getElementById('btn-plate');
 const btnLiftwall = document.getElementById('btn-liftwall');
 const btnWire = document.getElementById('btn-wire');
+const btnDepression = document.getElementById('btn-depression');
 const btnPlay = document.getElementById('btn-play');
 const btnExport = document.getElementById('btn-export');
 const btnClear = document.getElementById('btn-clear');
-const allBtns = [btnWall, btnDiag, btnErase, btnHero, btnBall, btnCrate, btnWeb, btnPlate, btnLiftwall, btnWire, btnPlay];
+const allBtns = [btnWall, btnDiag, btnErase, btnHero, btnBall, btnCrate, btnWeb, btnPlate, btnLiftwall, btnDepression, btnWire, btnPlay];
 
 // === 地块编辑 ===
 function setTile(row, col, value) {
@@ -35,6 +36,7 @@ function setTile(row, col, value) {
     tile.isPlate = false;
     tile.liftWall = null;
     tile.diagCorner = null;
+    tile.hasDepression = false;
     // 清理相关引线
     const key = K(row, col);
     for (let i = wireLinks.length - 1; i >= 0; i--) {
@@ -125,6 +127,17 @@ function placeLiftWall(row, col) {
   statusEl.textContent = `⇅ 升降墙已放置(${typeLabel})`;
 }
 
+function placeDepression(row, col) {
+  if (grid[row][col].base === T_WALL) {
+    statusEl.textContent = '⚠ 不能把洼地放在墙体上！';
+    return;
+  }
+  grid[row][col].hasDepression = true;
+  grid[row][col].hasWater = false;
+  render();
+  statusEl.textContent = '🕳 洼地已放置（高度-1）';
+}
+
 function placeHero(row, col) {
   const tile = grid[row][col];
   if (tile.base === T_WALL && tile.liftWall === null) {
@@ -206,6 +219,7 @@ function handleCanvasDown(e) {
     web:         () => placeWeb(cell.row, cell.col),
     plate:       () => placePlate(cell.row, cell.col),
     liftwall:    () => placeLiftWall(cell.row, cell.col),
+    depression:  () => placeDepression(cell.row, cell.col),
   };
   if (placeActions[editor.mode]) placeActions[editor.mode]();
 }
@@ -214,7 +228,7 @@ function handleCanvasMove(e) {
   const cell = getCellFromEvent(e);
   editor.hoverCell = cell;
 
-  if (editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall' || editor.mode === 'wire') {
+  if (editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall' || editor.mode === 'wire' || editor.mode === 'depression') {
     render();
     return;
   }
@@ -226,9 +240,10 @@ function handleCanvasMove(e) {
     wall:  () => setTile(cell.row, cell.col, T_WALL),
     diag:  () => placeDiagWall(cell.row, cell.col),
     erase: () => setTile(cell.row, cell.col, T_EMPTY),
-    web:      () => placeWeb(cell.row, cell.col),
-    plate:    () => placePlate(cell.row, cell.col),
-    liftwall: () => placeLiftWall(cell.row, cell.col),
+    web:        () => placeWeb(cell.row, cell.col),
+    plate:      () => placePlate(cell.row, cell.col),
+    liftwall:   () => placeLiftWall(cell.row, cell.col),
+    depression: () => placeDepression(cell.row, cell.col),
   };
   if (dragActions[editor.mode]) dragActions[editor.mode]();
 }
@@ -262,12 +277,13 @@ function setMode(newMode) {
     'web':         '模式: 蜘蛛网 — 点击/拖拽在空地上放置蜘蛛网',
     'plate':       '模式: 踏板 — 点击空地放置踏板',
     'liftwall':    `模式: 升降墙(${editor.currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`,
+    'depression':  '模式: 洼地 — 点击/拖拽在空地上放置洼地（高度-1）',
     'wire':        '模式: 引线 — 点击踏板然后点击升降墙连线',
     'play':        '模式: 操控 — 方向键/WASD 移动角色'
   };
   const activeBtns = {
     'wall': btnWall, 'diag': btnDiag, 'erase': btnErase,
-    'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'web': btnWeb, 'plate': btnPlate, 'liftwall': btnLiftwall, 'wire': btnWire, 'play': btnPlay
+    'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'web': btnWeb, 'plate': btnPlate, 'liftwall': btnLiftwall, 'depression': btnDepression, 'wire': btnWire, 'play': btnPlay
   };
 
   activeBtns[newMode].classList.add('active');
@@ -326,6 +342,7 @@ function exportMap() {
   const webArr = [];
   const plateArr = [];
   const liftData = {};
+  const depressionArr = [];
 
   for (let r = 0; r < GRID_SIZE; r++) {
     tiles[r] = [];
@@ -336,6 +353,7 @@ function exportMap() {
       if (tile.hasWeb) webArr.push(K(r, c));
       if (tile.isPlate) plateArr.push(K(r, c));
       if (tile.liftWall !== null) liftData[K(r, c)] = tile.liftWall;
+      if (tile.hasDepression) depressionArr.push(K(r, c));
     }
   }
   for (const crate of crates.values()) {
@@ -351,6 +369,7 @@ function exportMap() {
     webTiles: webArr,
     plateTiles: plateArr,
     liftWalls: liftData,
+    depressionTiles: depressionArr,
     wireLinks: wireLinks
   };
 

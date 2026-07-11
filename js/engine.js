@@ -16,6 +16,7 @@ class Tile {
     this.isPlate = false;       // 踏板
     this.hasWater = false;      // 水渍
     this.hasWeb = false;        // 蜘蛛网
+    this.hasDepression = false; // 洼地（高度-1）
   }
 }
 
@@ -186,11 +187,12 @@ function entityUnder(r, c, self) {
   return null;
 }
 
-// 格子脚底高度 = 格子基础高度(暂0) + 升降墙上升态加成(1)
+// 格子脚底高度 = 0 + 升降墙上升态(+1) + 洼地(-1)
 function tileFootLevel(r, c) {
   let level = 0;
   const tile = grid[r][c];
   if (tile.liftWall !== null && tile.base === T_WALL) level += 1;
+  if (tile.hasDepression) level -= 1;
   return level;
 }
 

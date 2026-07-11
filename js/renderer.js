@@ -459,6 +459,28 @@ function drawWebTile(row, col) {
   ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
 }
 
+// === 渲染：洼地 ===
+function drawDepressionTile(row, col) {
+  const x = col * TILE_SIZE;
+  const y = row * TILE_SIZE;
+  const s = TILE_SIZE / 8;
+
+  // 外圈略暗
+  ctx.fillStyle = '#2a2a3a';
+  ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+  // 中心凹陷
+  const grad = ctx.createRadialGradient(x + TILE_SIZE/2, y + TILE_SIZE/2, s*0.5, x + TILE_SIZE/2, y + TILE_SIZE/2, s*3.5);
+  grad.addColorStop(0, '#1a1a28');
+  grad.addColorStop(0.6, '#252535');
+  grad.addColorStop(1, '#3a3a4e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+  // 内侧阴影边
+  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + s, y + s, TILE_SIZE - s*2, TILE_SIZE - s*2);
+}
+
 // === 渲染：绳子 ===
 function drawRope() {
   if (!hero || !ball) return;
@@ -520,6 +542,15 @@ function render() {
       }
     }
   }
+  // 3.5. 洼地
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      const tile = grid[r][c];
+      if (tile.base !== T_WALL && tile.hasDepression && !tile.hasWater) {
+        drawDepressionTile(r, c);
+      }
+    }
+  }
   // 4. 踏板
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
@@ -557,12 +588,12 @@ function render() {
   drawGridLines();
 
   // 8. 悬停高亮
-  if ((editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall') && editor.hoverCell) {
+  if ((editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall' || editor.mode === 'depression') && editor.hoverCell) {
     const { row, col } = editor.hoverCell;
     const x = col * TILE_SIZE;
     const y = row * TILE_SIZE;
     const tile = grid[row][col];
-    const blocked = (editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall')
+    const blocked = (editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall' || editor.mode === 'depression')
       ? tile.base === T_WALL
       : editor.mode === 'wire'
       ? !editor.wireStart ? !tile.isPlate
