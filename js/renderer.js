@@ -248,7 +248,7 @@ function drawLiftWallTile(row, col, raised) {
   const x = col * TILE_SIZE;
   const y = row * TILE_SIZE;
   const s = TILE_SIZE / 8;
-  const type = liftWalls.get(K(row, col)) || 'up';
+  const type = grid[row][col].liftWall || 'up';
 
   if (raised) {
     if (type === 'up') {
@@ -430,7 +430,7 @@ function render() {
   // 1. 空地底色
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
-      if (grid[r][c] !== T_WALL) {
+      if (grid[r][c].base !== T_WALL) {
         drawEmptyTile(r, c);
       }
     }
@@ -440,31 +440,35 @@ function render() {
   // 3. 水
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
-      if (grid[r][c] !== T_WALL && waterTiles.has(K(r, c))) {
+      const tile = grid[r][c];
+      if (tile.base !== T_WALL && tile.hasWater) {
         drawWaterTile(r, c);
       }
     }
   }
   // 4. 踏板
-  for (const key of plateTiles) {
-    const [r, c] = key.split(',').map(Number);
-    drawPlateTile(r, c);
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      if (grid[r][c].isPlate) {
+        drawPlateTile(r, c);
+      }
+    }
   }
   // 5. 墙、蜘蛛网、升降墙
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
-      if (grid[r][c] === T_WALL) {
-        const corner = diagCorners.get(K(r, c));
-        if (corner) {
-          drawDiagWallTile(r, c, corner);
-        } else if (liftWalls.has(K(r, c))) {
+      const tile = grid[r][c];
+      if (tile.base === T_WALL) {
+        if (tile.diagCorner) {
+          drawDiagWallTile(r, c, tile.diagCorner);
+        } else if (tile.liftWall !== null) {
           drawLiftWallTile(r, c, true);
         } else {
           drawWallTile(r, c);
         }
-      } else if (liftWalls.has(K(r, c))) {
+      } else if (tile.liftWall !== null) {
         drawLiftWallTile(r, c, false);
-      } else if (webTiles.has(K(r, c))) {
+      } else if (tile.hasWeb) {
         drawWebTile(r, c);
       }
     }
@@ -483,12 +487,13 @@ function render() {
     const { row, col } = hoverCell;
     const x = col * TILE_SIZE;
     const y = row * TILE_SIZE;
+    const tile = grid[row][col];
     const blocked = (mode === 'web' || mode === 'plate' || mode === 'liftwall')
-      ? grid[row][col] === T_WALL
+      ? tile.base === T_WALL
       : mode === 'wire'
-      ? !wireStart ? !plateTiles.has(K(row, col))
-        : !liftWalls.has(K(row, col))
-      : grid[row][col] === T_WALL && !liftWalls.has(K(row, col));
+      ? !wireStart ? !tile.isPlate
+        : tile.liftWall === null
+      : tile.base === T_WALL && tile.liftWall === null;
     if (blocked) {
       ctx.fillStyle = 'rgba(255, 60, 60, 0.4)';
     } else {

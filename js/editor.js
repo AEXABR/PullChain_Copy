@@ -28,10 +28,13 @@ function setTile(row, col, value) {
       crates.delete(K(row, col));
       crates.delete(K(row, col) + ':1');
     }
-    waterTiles.delete(K(row, col));
-    webTiles.delete(K(row, col));
-    plateTiles.delete(K(row, col));
-    liftWalls.delete(K(row, col));
+    // 重置格子的全部特性
+    const tile = grid[row][col];
+    tile.hasWater = false;
+    tile.hasWeb = false;
+    tile.isPlate = false;
+    tile.liftWall = null;
+    tile.diagCorner = null;
     // 清理相关引线
     const key = K(row, col);
     for (let i = wireLinks.length - 1; i >= 0; i--) {
@@ -40,10 +43,9 @@ function setTile(row, col, value) {
       }
     }
     if (wireStart === key) wireStart = null;
-    diagCorners.delete(K(row, col));
   }
-  if (grid[row][col] === value) return;
-  grid[row][col] = value;
+  if (grid[row][col].base === value) return;
+  grid[row][col].base = value;
   render();
 }
 
@@ -53,13 +55,14 @@ function placeDiagWall(row, col) {
     // 允许覆盖已有的斜角墙（更改缺口朝向）或普通墙（升级为斜角墙）
   }
   setTile(row, col, T_WALL);
-  diagCorners.set(K(row, col), currentDiagCorner);
+  grid[row][col].diagCorner = currentDiagCorner;
   render();
   statusEl.textContent = `${DIAG_SYMBOLS[currentDiagCorner]} 斜角墙(${currentDiagCorner}缺口)已放置`;
 }
 
 function placeCrate(row, col) {
-  if (grid[row][col] === T_WALL && !liftWalls.has(K(row, col))) {
+  const tile = grid[row][col];
+  if (tile.base === T_WALL && tile.liftWall === null) {
     statusEl.textContent = '⚠ 不能把箱子放在墙体上！';
     return;
   }
@@ -79,35 +82,35 @@ function placeCrate(row, col) {
 }
 
 function placeWeb(row, col) {
-  if (grid[row][col] === T_WALL) {
+  if (grid[row][col].base === T_WALL) {
     statusEl.textContent = '⚠ 不能把蜘蛛网放在墙体上！';
     return;
   }
-  waterTiles.delete(K(row, col));
-  webTiles.add(K(row, col));
+  grid[row][col].hasWater = false;
+  grid[row][col].hasWeb = true;
   render();
   statusEl.textContent = '🕸 蜘蛛网已放置';
 }
 
 function placePlate(row, col) {
-  if (grid[row][col] === T_WALL) {
+  if (grid[row][col].base === T_WALL) {
     statusEl.textContent = '⚠ 不能把踏板放在墙体上！';
     return;
   }
-  plateTiles.add(K(row, col));
+  grid[row][col].isPlate = true;
   render();
   statusEl.textContent = '▫ 踏板已放置';
 }
 
 function placeLiftWall(row, col) {
-  const key = K(row, col);
-  if (grid[row][col] === T_WALL || liftWalls.has(key)) {
+  const tile = grid[row][col];
+  if (tile.base === T_WALL || tile.liftWall !== null) {
     statusEl.textContent = '⚠ 此处已有墙体或升降墙！';
     return;
   }
-  liftWalls.set(key, currentLiftType);
+  tile.liftWall = currentLiftType;
   if (currentLiftType === 'down') {
-    grid[row][col] = T_WALL;
+    tile.base = T_WALL;
   }
   render();
   const typeLabel = currentLiftType === 'up' ? '上升型(默认下降)' : '下降型(默认升起)';
@@ -115,7 +118,8 @@ function placeLiftWall(row, col) {
 }
 
 function placeHero(row, col) {
-  if (grid[row][col] === T_WALL && !liftWalls.has(K(row, col))) {
+  const tile = grid[row][col];
+  if (tile.base === T_WALL && tile.liftWall === null) {
     statusEl.textContent = '⚠ 不能把角色放在墙体上！';
     return;
   }
@@ -132,7 +136,8 @@ function placeHero(row, col) {
 }
 
 function placeBall(row, col) {
-  if (grid[row][col] === T_WALL && !liftWalls.has(K(row, col))) {
+  const tile = grid[row][col];
+  if (tile.base === T_WALL && tile.liftWall === null) {
     statusEl.textContent = '⚠ 不能把球放在墙体上！';
     return;
   }
@@ -164,13 +169,13 @@ function handleCanvasDown(e) {
 
   if (mode === 'wire') {
     const key = K(cell.row, cell.col);
-    if (plateTiles.has(key)) {
+    if (grid[cell.row][cell.col].isPlate) {
       wireStart = key;
       statusEl.textContent = `🔗 已选踏板(${key}) — 点击升降墙完成连线`;
       render();
       return;
     }
-    if (liftWalls.has(key) && wireStart) {
+    if (grid[cell.row][cell.col].liftWall !== null && wireStart) {
       wireLinks.push({ plate: wireStart, wall: key });
       statusEl.textContent = `🔗 引线已连接: ${wireStart} → ${key}`;
       wireStart = null;
@@ -308,12 +313,26 @@ document.querySelectorAll('#toolbar button[data-mode]').forEach(b =>
 
 // === 导出 ===
 function exportMap() {
-  const tiles = grid.map(row => [...row]);
+  const tiles = [];
+  const diagData = {};
+  const webArr = [];
+  const plateArr = [];
+  const liftData = {};
+
+  for (let r = 0; r < GRID_SIZE; r++) {
+    tiles[r] = [];
+    for (let c = 0; c < GRID_SIZE; c++) {
+      const tile = grid[r][c];
+      tiles[r][c] = tile.base;
+      if (tile.diagCorner !== null) diagData[K(r, c)] = tile.diagCorner;
+      if (tile.hasWeb) webArr.push(K(r, c));
+      if (tile.isPlate) plateArr.push(K(r, c));
+      if (tile.liftWall !== null) liftData[K(r, c)] = tile.liftWall;
+    }
+  }
   for (const crate of crates.values()) {
     tiles[crate.row][crate.col] = Object.keys(CRATES).indexOf(crate.crateKey) + 2;
   }
-  const diagData = {};
-  for (const [k, v] of diagCorners) diagData[k] = v;
   const data = {
     width: GRID_SIZE,
     height: GRID_SIZE,
@@ -321,9 +340,9 @@ function exportMap() {
     diagCorners: diagData,
     heroStart: hero ? { row: hero.row, col: hero.col } : null,
     ballStart: ball ? { row: ball.row, col: ball.col } : null,
-    webTiles: [...webTiles],
-    plateTiles: [...plateTiles],
-    liftWalls: Object.fromEntries(liftWalls),
+    webTiles: webArr,
+    plateTiles: plateArr,
+    liftWalls: liftData,
     wireLinks: wireLinks
   };
 
@@ -345,20 +364,15 @@ function clearMap() {
   if (!confirm('确定要清空整个地图吗？此操作不可撤销。')) return;
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
-      grid[r][c] = T_EMPTY;
+      grid[r][c] = new Tile();
     }
   }
   hero = null;
   ball = null;
   crates.clear();
   currentCrateKey = 'wood';
-  waterTiles.clear();
-  webTiles.clear();
-  plateTiles.clear();
-  liftWalls.clear();
   wireLinks.length = 0;
   wireStart = null;
-  diagCorners.clear();
   updateCrateBtn();
   statusEl.textContent = '🗺 地图已清空';
   render();

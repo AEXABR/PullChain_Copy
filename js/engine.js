@@ -7,6 +7,18 @@ const TILE_SIZE = CANVAS_SIZE / GRID_SIZE; // 32px
 const T_EMPTY = 0;
 const T_WALL  = 1;
 
+// === 地块类（统一管理格子的全部属性） ===
+class Tile {
+  constructor() {
+    this.base = T_EMPTY;        // T_EMPTY | T_WALL
+    this.diagCorner = null;     // 'TL'|'TR'|'BL'|'BR'|null  斜角墙缺口朝向
+    this.liftWall = null;       // 'up'|'down'|null  升降墙类型
+    this.isPlate = false;       // 踏板
+    this.hasWater = false;      // 水渍
+    this.hasWeb = false;        // 蜘蛛网
+  }
+}
+
 // === 实体类 ===
 class Entity {
   constructor(row, col) { this.row = row; this.col = col; this.height = 0; this.selfHeight = 1; }
@@ -32,20 +44,15 @@ const DIAG_SYMBOLS = { TL: '◤', TR: '◥', BL: '◣', BR: '◢' };
 
 // === 状态 ===
 let mode = 'wall';          // 'wall' | 'erase' | 'place_hero' | 'place_ball' | 'play' | ...
-let grid = [];              // grid[row][col]: 0=空地, 1=墙体
+let grid = [];              // grid[row][col]: Tile 对象
 let hero = null;            // Hero | null
 let ball = null;            // Ball | null
 const crates = new Map();   // "row,col" -> Crate
 let currentCrateKey = 'wood'; // 当前选中的箱子类型
 let currentDiagCorner = 'TL'; // 当前斜角墙缺口朝向
-let waterTiles = new Set();   // 有水贴图的空地坐标 "row,col"
-let webTiles = new Set();     // 有蜘蛛网的空地坐标 "row,col"
-const plateTiles = new Set(); // 踏板位置 "row,col"
-const liftWalls = new Map();  // 升降墙位置 "row,col" → 'up'|'down'
 let currentLiftType = 'up';   // 当前放置类型
 const wireLinks = [];         // [{plate: "r,c", wall: "r,c"}, ...]
 let wireStart = null;         // 引线模式：选中的踏板key
-const diagCorners = new Map(); // "row,col" → 'TL'|'TR'|'BL'|'BR'  斜角墙缺口朝向
 let isDrawing = false;        // 鼠标拖拽中
 let hoverCell = null;         // {row, col} | null  鼠标悬停格子
 
@@ -53,7 +60,10 @@ let hoverCell = null;         // {row, col} | null  鼠标悬停格子
 function initGrid() {
   grid = [];
   for (let r = 0; r < GRID_SIZE; r++) {
-    grid[r] = new Array(GRID_SIZE).fill(T_EMPTY);
+    grid[r] = [];
+    for (let c = 0; c < GRID_SIZE; c++) {
+      grid[r][c] = new Tile();
+    }
   }
 }
 initGrid();
@@ -74,7 +84,7 @@ function entityForPush(r, c) {
   if (ball && ball.row === r && ball.col === c) return ball;
   return crates.get(K(r, c)) || crates.get(K(r, c) + ':1') || null;
 }
-function isSolid(r, c)     { return grid[r][c] === T_WALL || crateAt(r, c) !== null; }
+function isSolid(r, c)     { return grid[r][c].base === T_WALL || crateAt(r, c) !== null; }
 
 // crates快照（回滚用）
 function snapshotCrates() {
@@ -90,9 +100,10 @@ function getPushChain(r, c, dr, dc, pusherHeight = -1) {
   let stepHeight = pusherHeight; // 尝试踩上该位置实体的脚底高度
   while (true) {
     if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return null;
-    if (grid[r][c] === T_WALL && !(liftWalls.has(K(r, c)) && stepHeight >= tileFootLevel(r, c))) return null;
+    const tile = grid[r][c];
+    if (tile.base === T_WALL && !(tile.liftWall !== null && stepHeight >= tileFootLevel(r, c))) return null;
     const ent = entityForPush(r, c);
-    if (ent && webTiles.has(K(r, c))) return null;
+    if (ent && tile.hasWeb) return null;
     if (!ent) return chain;
     // 推动者（或链中上一实体）可站到该实体上方 → 不推，返回当前链
     if (stepHeight >= ent.height + ent.selfHeight) return chain;
@@ -173,7 +184,8 @@ function entityUnder(r, c, self) {
 // 格子脚底高度 = 格子基础高度(暂0) + 升降墙上升态加成(1)
 function tileFootLevel(r, c) {
   let level = 0;
-  if (liftWalls.has(K(r, c)) && grid[r][c] === T_WALL) level += 1;
+  const tile = grid[r][c];
+  if (tile.liftWall !== null && tile.base === T_WALL) level += 1;
   return level;
 }
 
@@ -198,9 +210,14 @@ function updateAllHeights() {
 
 // === 升降墙系统 ===
 function updateLiftWalls() {
+  // 从 wireLinks 构建 wall→plates 映射
   const wallPlates = new Map();
-  for (const wkey of liftWalls.keys()) {
-    wallPlates.set(wkey, new Set());
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      if (grid[r][c].liftWall !== null) {
+        wallPlates.set(K(r, c), new Set());
+      }
+    }
   }
   for (const link of wireLinks) {
     if (wallPlates.has(link.wall)) {
@@ -213,13 +230,11 @@ function updateLiftWalls() {
       const [pr, pc] = pk.split(',').map(Number);
       return entityAt(pr, pc) !== null;
     });
-    const type = liftWalls.get(wkey) || 'up';
-    if (type === 'up') {
-      if (allPressed) grid[wr][wc] = T_WALL;
-      else grid[wr][wc] = T_EMPTY;
+    const tile = grid[wr][wc];
+    if (tile.liftWall === 'up') {
+      tile.base = allPressed ? T_WALL : T_EMPTY;
     } else {
-      if (allPressed) grid[wr][wc] = T_EMPTY;
-      else grid[wr][wc] = T_WALL;
+      tile.base = allPressed ? T_EMPTY : T_WALL;
     }
   }
 }
@@ -239,7 +254,9 @@ function meltSnow() {
           crates.set(key, topCrate);
         }
       }
-      waterTiles.add(key.endsWith(':1') ? key.slice(0, -2) : key);
+      const waterKey = key.endsWith(':1') ? key.slice(0, -2) : key;
+      const [wr, wc] = waterKey.split(',').map(Number);
+      grid[wr][wc].hasWater = true;
     }
   }
 }
@@ -259,7 +276,7 @@ function diagCornersFor(dr, dc) {
 function followBall(prevRow, prevCol) {
   if (!ball) return true;
   if (dist(hero.row, hero.col, ball.row, ball.col) <= 1) return true;
-  if (webTiles.has(K(ball.row, ball.col))) return false;
+  if (grid[ball.row][ball.col].hasWeb) return false;
 
   const prevBallRow = ball.row, prevBallCol = ball.col;
   const dr = Math.sign(prevRow - ball.row);
@@ -277,9 +294,9 @@ function followBall(prevRow, prevCol) {
     const c2chain = getPushChain(c2r, c2c, 0, dc, ball.height);
     const needed = diagCornersFor(dr, dc);
     const c1clear = grid[c1r] && (!isSolid(c1r, c1c) || c1chain !== null
-                                   || (needed && diagCorners.get(K(c1r, c1c)) === needed[0]));
+                                   || (needed && grid[c1r][c1c].diagCorner === needed[0]));
     const c2clear = grid[c2r] && (!isSolid(c2r, c2c) || c2chain !== null
-                                   || (needed && diagCorners.get(K(c2r, c2c)) === needed[1]));
+                                   || (needed && grid[c2r][c2c].diagCorner === needed[1]));
     if (c1clear && c2clear) {
       diagOk = true;
       diagCorner = { c1chain, c2chain };
@@ -320,7 +337,8 @@ function followBall(prevRow, prevCol) {
       const ent = entityForPush(c.row, c.col);
       const canStep = !ent || ball.height >= ent.height + ent.selfHeight;
       const targetFoot = tileFootLevel(c.row, c.col);
-      const canAccess = grid[c.row][c.col] !== T_WALL || (liftWalls.has(K(c.row, c.col)) && ball.height >= targetFoot);
+      const tile = grid[c.row][c.col];
+      const canAccess = tile.base !== T_WALL || (tile.liftWall !== null && ball.height >= targetFoot);
       if (canStep && canAccess) {
         ball.row = c.row; ball.col = c.col;
         break;
@@ -337,12 +355,13 @@ function followBall(prevRow, prevCol) {
 
 // 尝试移动主角：快照→推箱→移动→跟随→失败回滚。返回 true=成功
 function tryMoveHero(dr, dc) {
-  if (webTiles.has(K(hero.row, hero.col))) return false;
+  if (grid[hero.row][hero.col].hasWeb) return false;
   const nr = hero.row + dr, nc = hero.col + dc;
 
   if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return false;
   const targetFoot = tileFootLevel(nr, nc);
-  if (grid[nr][nc] === T_WALL && !(liftWalls.has(K(nr, nc)) && hero.height >= targetFoot)) return false;
+  const targetTile = grid[nr][nc];
+  if (targetTile.base === T_WALL && !(targetTile.liftWall !== null && hero.height >= targetFoot)) return false;
 
   // 主角高度 >= 目标实体顶面 → 站到同格上方（不推动）
   const targetEnt = entityAt(nr, nc);
@@ -358,7 +377,7 @@ function tryMoveHero(dr, dc) {
   }
 
   // 站上升降墙
-  if (grid[nr][nc] === T_WALL && liftWalls.has(K(nr, nc)) && !targetEnt) {
+  if (targetTile.base === T_WALL && targetTile.liftWall !== null && !targetEnt) {
     const prevRow = hero.row, prevCol = hero.col;
     hero.row = nr; hero.col = nc;
     if (!followBall(prevRow, prevCol)) {
