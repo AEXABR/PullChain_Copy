@@ -418,7 +418,6 @@
           if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
           if (isSolid(c.row, c.col)) continue;
           if (dist(hero.row, hero.col, c.row, c.col) > 1) continue;
-          if (d > 1) continue;
           ball.row = c.row;
           ball.col = c.col;
           ballMoved = true;
