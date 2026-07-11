@@ -157,7 +157,8 @@
         if (ent && webTiles.has(K(r, c))) return null;
         if (!ent) return chain;
         // 推动者（或链中上一实体）可站到该实体上方 → 不推，返回当前链
-        if (stepHeight > ent.height + ent.selfHeight) return chain;
+        if (stepHeight >= ent.height + ent.selfHeight) return chain;
+        if (stepHeight !== ent.height) return null;
         chain.push(ent);
         stepHeight = ent.height; // 被推实体的当前脚底高度传给下一格判定
         r += dr; c += dc;
@@ -172,17 +173,39 @@
         if (ent instanceof Crate) {
           const oldKey = K(ent.row, ent.col);
           const stackedKey = oldKey + ':1';
-          const stacked = crates.get(stackedKey); // 同格上层箱子
+          // 识别实体在哪个槽位（雪融化后上层箱子可能留在:1槽）
+          const atBottom = crates.get(oldKey) === ent;
+          const atTop = crates.get(stackedKey) === ent;
+          // 找同格另一层的箱子（排除自身）
+          let stacked = null;
+          if (atBottom) {
+            stacked = crates.get(stackedKey);
+          } else if (atTop) {
+            stacked = crates.get(oldKey);
+          }
           // 删除旧位置
-          crates.delete(oldKey);
-          if (stacked) crates.delete(stackedKey);
-          // 移动到底层
+          if (atBottom) crates.delete(oldKey);
+          if (atTop) crates.delete(stackedKey);
+          if (stacked) {
+            const sk = K(stacked.row, stacked.col);
+            crates.delete(sk);
+            crates.delete(sk + ':1');
+          }
+          // 移动到目标格（已有箱子则叠到上层）
           ent.row = newR; ent.col = newC;
-          crates.set(K(newR, newC), ent);
-          // 上层箱子跟随
+          const destKey = K(newR, newC);
+          const destHadCrate = crates.has(destKey);
+          if (destHadCrate) {
+            crates.set(destKey + ':1', ent);
+          } else {
+            crates.set(destKey, ent);
+          }
+          // 上层箱子跟随（同格叠放；若ent已占:1槽则上层箱子无处可放，极限情况丢失）
           if (stacked) {
             stacked.row = newR; stacked.col = newC;
-            crates.set(K(newR, newC) + ':1', stacked);
+            if (!destHadCrate) {
+              crates.set(destKey + ':1', stacked);
+            }
           }
         } else {
           ent.row = newR; ent.col = newC;
@@ -571,7 +594,7 @@
         for (const c of candidates) {
           if (!isValid(c)) continue;
           const ent = entityForPush(c.row, c.col);
-          const canStep = !ent || ball.height > ent.height + ent.selfHeight;
+          const canStep = !ent || ball.height >= ent.height + ent.selfHeight;
           const targetFoot = tileFootLevel(c.row, c.col);
           const canAccess = grid[c.row][c.col] !== T_WALL || (liftWalls.has(K(c.row, c.col)) && ball.height >= targetFoot);
           if (canStep && canAccess) {
@@ -599,13 +622,14 @@
       const targetFoot = tileFootLevel(nr, nc);
       if (grid[nr][nc] === T_WALL && !(liftWalls.has(K(nr, nc)) && hero.height >= targetFoot)) return false;
 
-      // 主角高度 > 目标实体顶面（脚底+自身高度）→ 站到同格上方（不推动）
+      // 主角高度 >= 目标实体顶面（脚底+自身高度）→ 站到同格上方（不推动）
       const targetEnt = entityAt(nr, nc);
-      if (targetEnt && hero.height > targetEnt.height + targetEnt.selfHeight) {
+      if (targetEnt && hero.height >= targetEnt.height + targetEnt.selfHeight) {
         const prevRow = hero.row, prevCol = hero.col;
         hero.row = nr; hero.col = nc;
         if (!followBall(prevRow, prevCol)) {
           hero.row = prevRow; hero.col = prevCol;
+          if (ball) ball.toggle();
           return false;
         }
         return true;
@@ -617,6 +641,7 @@
         hero.row = nr; hero.col = nc;
         if (!followBall(prevRow, prevCol)) {
           hero.row = prevRow; hero.col = prevCol;
+          if (ball) ball.toggle();
           return false;
         }
         return true;
@@ -766,7 +791,16 @@
         if (crate.crateKey !== 'snow') continue;
         if (dist(ball.row, ball.col, crate.row, crate.col) <= 1) {
           crates.delete(key);
-          waterTiles.add(key);
+          // 雪在底层时，把上层箱子移到正常槽位（否则留在:1槽引发pushChain双重身份bug）
+          if (!key.endsWith(':1')) {
+            const topKey = key + ':1';
+            const topCrate = crates.get(topKey);
+            if (topCrate) {
+              crates.delete(topKey);
+              crates.set(key, topCrate);
+            }
+          }
+          waterTiles.add(key.endsWith(':1') ? key.slice(0, -2) : key);
         }
       }
     }
@@ -920,7 +954,7 @@
     function drawCrateTile(crate) {
       const row = crate.row, col = crate.col;
       const stacked = entityUnder(row, col, crate) !== null; // 堆叠在其他实体上
-      const inset = stacked ? 3 : 1; // 平常内缩1圈，堆叠再缩2圈
+      const inset = stacked ? 2 : 1; // 平常内缩1圈，堆叠内缩2圈
       if (crate.crateKey === 'snow') {
         drawSnowTile(row, col, inset);
         return;
