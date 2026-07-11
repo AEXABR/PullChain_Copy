@@ -268,7 +268,7 @@ function meltSnow() {
   }
 }
 
-// === 视线检测（同行或同列直线，遇墙阻断） ===
+// === 视线检测（同行或同列直线，遇墙或实体阻断） ===
 function hasLineOfSight(r1, c1, r2, c2) {
   if (r1 !== r2 && c1 !== c2) return false;
   if (r1 === r2) {
@@ -276,12 +276,14 @@ function hasLineOfSight(r1, c1, r2, c2) {
     const maxC = Math.max(c1, c2);
     for (let c = minC + 1; c < maxC; c++) {
       if (grid[r1][c].base === T_WALL) return false;
+      if (entityAt(r1, c) !== null) return false;
     }
   } else {
     const minR = Math.min(r1, r2);
     const maxR = Math.max(r1, r2);
     for (let r = minR + 1; r < maxR; r++) {
       if (grid[r][c1].base === T_WALL) return false;
+      if (entityAt(r, c1) !== null) return false;
     }
   }
   return true;
