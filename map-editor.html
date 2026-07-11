@@ -189,17 +189,18 @@
     }
 
     function setTile(row, col, value) {
-      if (value === T_WALL) {
+      if (value === T_WALL || value === T_EMPTY) {
         const ent = entityAt(row, col);
         if (ent instanceof Hero) {
           hero = null;
-          statusEl.textContent = '⚠ 角色被墙体覆盖，已移除角色';
+          statusEl.textContent = '⚠ 角色被覆盖，已移除角色';
         } else if (ent instanceof Ball) {
           ball = null;
-          statusEl.textContent = '⚠ 球被墙体覆盖，已移除球';
+          statusEl.textContent = '⚠ 球被覆盖，已移除球';
         } else if (ent instanceof Crate) {
           crates.delete(`${row},${col}`);
         }
+        waterTiles.delete(`${row},${col}`);
       }
       if (grid[row][col] === value) return;
       grid[row][col] = value;
