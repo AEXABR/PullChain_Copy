@@ -495,40 +495,12 @@
         const dir = KEY_DIR[e.key];
         if (dir) {
           e.preventDefault();
-          const nr = hero.row + dir.dr;
-          const nc = hero.col + dir.dc;
-          // 边界 / 墙检查
-          if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return;
-          if (grid[nr][nc] === T_WALL) return;
-
-          const prevRow = hero.row, prevCol = hero.col;
-
-          // 链式推动：扫描目标方向上的连续实体
-          const chain = getPushChain(nr, nc, dir.dr, dir.dc);
-          if (chain === null) return; // 墙或出界阻塞
-
-          // 快照（followBall失败时回滚用）
-          const savedCrates = snapshotCrates();
-          const savedBallRow = ball ? ball.row : null, savedBallCol = ball ? ball.col : null;
-
-          // 链式推动 + 移动主角
-          pushChain(chain, dir.dr, dir.dc);
-          hero.row = nr; hero.col = nc;
-
-          // 绳子跟随
-          if (!followBall(prevRow, prevCol)) {
-            restoreCrates(savedCrates);
-            if (ball) { ball.row = savedBallRow; ball.col = savedBallCol; }
-            hero.row = prevRow; hero.col = prevCol;
-            ball.toggle();
-            render();
-            return;
+          if (tryMoveHero(dir.dr, dir.dc)) {
+            meltSnow();
+            statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +
+              (ball ? `  球位置: (${ball.row}, ${ball.col}) [${ball.lightOn ? '💡开' : '🌑关'}]` : '') +
+              (ball ? `  距离: ${dist(hero.row, hero.col, ball.row, ball.col)}` : '');
           }
-
-          meltSnow();
-          statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +
-            (ball ? `  球位置: (${ball.row}, ${ball.col}) [${ball.lightOn ? '💡开' : '🌑关'}]` : '') +
-            (ball ? `  距离: ${dist(hero.row, hero.col, ball.row, ball.col)}` : '');
           render();
         }
       }
