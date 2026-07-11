@@ -199,7 +199,8 @@
     let waterTiles = new Set();  // 有水贴图的空地坐标 "row,col"
     let webTiles = new Set();    // 有蜘蛛网的空地坐标 "row,col"
     const plateTiles = new Set(); // 踏板位置 "row,col"
-    const liftWalls = new Set();  // 升降墙位置 "row,col"
+    const liftWalls = new Map();  // 升降墙位置 "row,col" → 'up'|'down'
+    let currentLiftType = 'up';   // 当前放置类型
     const wireLinks = [];         // [{plate: "r,c", wall: "r,c"}, ...]
     let wireStart = null;         // 引线模式：选中的踏板key
     const diagCorners = new Map(); // "row,col" → 'TL'|'TR'|'BL'|'BR'  斜角墙缺口朝向
@@ -352,7 +353,7 @@
         'place_crate': `模式: 放置${CRATES[currentCrateKey].name} — 点击空地放置`,
         'web':         '模式: 蜘蛛网 — 点击/拖拽在空地上放置蜘蛛网',
         'plate':       '模式: 踏板 — 点击空地放置踏板',
-        'liftwall':    '模式: 升降墙 — 点击空地放置升降墙',
+        'liftwall':    `模式: 升降墙(${currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`,
         'wire':        '模式: 引线 — 点击踏板然后点击升降墙连线',
         'play':        '模式: 操控 — 方向键/WASD 移动角色'
       };
@@ -365,6 +366,7 @@
       if (newMode === 'place_crate') updateCrateBtn();
       if (newMode === 'diag') updateDiagBtn();
       if (newMode === 'wire') wireStart = null;
+      if (newMode === 'liftwall') updateLiftBtn();
       statusEl.textContent = modeLabels[newMode];
       render();
     }
@@ -379,6 +381,10 @@
 
     function updateDiagBtn() {
       btnDiag.textContent = `${DIAG_SYMBOLS[currentDiagCorner]} 斜角墙 [7]`;
+    }
+
+    function updateLiftBtn() {
+      btnLiftwall.textContent = currentLiftType === 'up' ? '⇅ 升墙(↑) [0]' : '⇅ 降墙(↓) [0]';
     }
 
     document.querySelectorAll('#toolbar button[data-mode]').forEach(b =>
@@ -398,6 +404,13 @@
           currentDiagCorner = DIAG_CORNERS[(idx + 1) % DIAG_CORNERS.length];
           updateDiagBtn();
           statusEl.textContent = `模式: 画斜角墙(${DIAG_SYMBOLS[currentDiagCorner]}缺口) — 点击/拖拽画布放置`;
+          return;
+        }
+        if (b.dataset.mode === 'liftwall' && mode === 'liftwall') {
+          // 已在升降墙模式则循环切换类型
+          currentLiftType = currentLiftType === 'up' ? 'down' : 'up';
+          updateLiftBtn();
+          statusEl.textContent = `模式: 升降墙(${currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`;
           return;
         }
         setMode(b.dataset.mode);
@@ -420,7 +433,7 @@
         ballStart: ball ? { row: ball.row, col: ball.col } : null,
         webTiles: [...webTiles],
         plateTiles: [...plateTiles],
-        liftWalls: [...liftWalls],
+        liftWalls: Object.fromEntries(liftWalls),
         wireLinks: wireLinks
       };
 
@@ -587,11 +600,11 @@
       return true;
     }
 
-    // 升降墙更新：检查踏板，全部踩下则升起
+    // 升降墙更新：检查踏板，按类型决定升降
     function updateLiftWalls() {
       // 为每个升降墙收集其连接的所有踏板
       const wallPlates = new Map(); // wallKey → Set of plateKeys
-      for (const wkey of liftWalls) {
+      for (const wkey of liftWalls.keys()) {
         wallPlates.set(wkey, new Set());
       }
       for (const link of wireLinks) {
@@ -599,24 +612,43 @@
           wallPlates.get(link.wall).add(link.plate);
         }
       }
-      // 判断每个墙是否应升起（所有连接的踏板都被踩下，且至少有1个连接）
+      // 判断每个墙的状态（所有连接的踏板都被踩下，且至少有1个连接）
       for (const [wkey, plates] of wallPlates) {
         const [wr, wc] = wkey.split(',').map(Number);
         const allPressed = plates.size > 0 && [...plates].every(pk => {
           const [pr, pc] = pk.split(',').map(Number);
           return entityAt(pr, pc) !== null;
         });
-        if (allPressed) {
-          if (grid[wr][wc] !== T_WALL) {
-            grid[wr][wc] = T_WALL;
-            const ent = entityAt(wr, wc);
-            if (ent) ent.height++;
+        const type = liftWalls.get(wkey) || 'up';
+        if (type === 'up') {
+          // 上升型：踏板全踩下 → 升起
+          if (allPressed) {
+            if (grid[wr][wc] !== T_WALL) {
+              grid[wr][wc] = T_WALL;
+              const ent = entityAt(wr, wc);
+              if (ent) ent.height++;
+            }
+          } else {
+            if (grid[wr][wc] === T_WALL) {
+              const ent = entityAt(wr, wc);
+              if (ent && ent.height > 0) ent.height--;
+              grid[wr][wc] = T_EMPTY;
+            }
           }
         } else {
-          if (grid[wr][wc] === T_WALL) {
-            const ent = entityAt(wr, wc);
-            if (ent && ent.height > 0) ent.height--;
-            grid[wr][wc] = T_EMPTY;
+          // 下降型：踏板全踩下 → 下降
+          if (allPressed) {
+            if (grid[wr][wc] === T_WALL) {
+              const ent = entityAt(wr, wc);
+              if (ent && ent.height > 0) ent.height--;
+              grid[wr][wc] = T_EMPTY;
+            }
+          } else {
+            if (grid[wr][wc] !== T_WALL) {
+              grid[wr][wc] = T_WALL;
+              const ent = entityAt(wr, wc);
+              if (ent) ent.height++;
+            }
           }
         }
       }
@@ -883,22 +915,40 @@
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
+      const type = liftWalls.get(K(row, col)) || 'up';
 
       if (raised) {
-        // 升起态：真墙（略红调区分普通墙）
-        ctx.fillStyle = '#665555';
-        ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-        ctx.strokeStyle = '#887777';
-        ctx.lineWidth = 1;
-        const third = TILE_SIZE / 3;
-        ctx.beginPath();
-        ctx.moveTo(x, y + third);
-        ctx.lineTo(x + TILE_SIZE, y + third);
-        ctx.moveTo(x, y + third * 2);
-        ctx.lineTo(x + TILE_SIZE, y + third * 2);
-        ctx.stroke();
-        ctx.strokeStyle = '#554444';
-        ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+        if (type === 'up') {
+          // 上升型升起态：蓝色墙
+          ctx.fillStyle = '#5566AA';
+          ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+          ctx.strokeStyle = '#7788BB';
+          ctx.lineWidth = 1;
+          const third = TILE_SIZE / 3;
+          ctx.beginPath();
+          ctx.moveTo(x, y + third);
+          ctx.lineTo(x + TILE_SIZE, y + third);
+          ctx.moveTo(x, y + third * 2);
+          ctx.lineTo(x + TILE_SIZE, y + third * 2);
+          ctx.stroke();
+          ctx.strokeStyle = '#445577';
+          ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+        } else {
+          // 下降型升起态：红色墙
+          ctx.fillStyle = '#665555';
+          ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+          ctx.strokeStyle = '#887777';
+          ctx.lineWidth = 1;
+          const third = TILE_SIZE / 3;
+          ctx.beginPath();
+          ctx.moveTo(x, y + third);
+          ctx.lineTo(x + TILE_SIZE, y + third);
+          ctx.moveTo(x, y + third * 2);
+          ctx.lineTo(x + TILE_SIZE, y + third * 2);
+          ctx.stroke();
+          ctx.strokeStyle = '#554444';
+          ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+        }
       } else {
         // 下降态：半高虚线
         ctx.strokeStyle = '#887777';
@@ -1052,13 +1102,20 @@
     }
 
     function placeLiftWall(row, col) {
-      if (grid[row][col] === T_WALL) {
-        statusEl.textContent = '⚠ 此处已有墙体！';
+      const key = K(row, col);
+      if (grid[row][col] === T_WALL || liftWalls.has(key)) {
+        statusEl.textContent = '⚠ 此处已有墙体或升降墙！';
         return;
       }
-      liftWalls.add(K(row, col));
+      liftWalls.set(key, currentLiftType);
+      if (currentLiftType === 'down') {
+        grid[row][col] = T_WALL;
+        const ent = entityAt(row, col);
+        if (ent) ent.height++;
+      }
       render();
-      statusEl.textContent = '⇅ 升降墙已放置(下降态)';
+      const typeLabel = currentLiftType === 'up' ? '上升型(默认下降)' : '下降型(默认升起)';
+      statusEl.textContent = `⇅ 升降墙已放置(${typeLabel})`;
     }
 
     // === 绳子 ===
