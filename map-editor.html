@@ -130,6 +130,11 @@
       if (ball && ball.row === r && ball.col === c) return ball;
       return crateAt(r, c);
     }
+    // entityForPush: 推链专用，排除主角（主角是推者不被推，且不能挡住脚下实体）
+    function entityForPush(r, c) {
+      if (ball && ball.row === r && ball.col === c) return ball;
+      return crateAt(r, c);
+    }
     function isSolid(r, c)     { return grid[r][c] === T_WALL || crateAt(r, c) !== null; }
 
     // crates快照（回滚用）
@@ -146,7 +151,7 @@
       while (true) {
         if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return null;
         if (grid[r][c] === T_WALL) return null;
-        const ent = entityAt(r, c);
+        const ent = entityForPush(r, c);
         if (ent && webTiles.has(K(r, c))) return null;
         if (!ent) return chain;
         chain.push(ent);
