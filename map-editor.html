@@ -141,6 +141,19 @@
       return false;
     }
 
+    // 链式推动：从(r,c)沿(dr,dc)扫描，返回可推动的实体链。null=阻塞
+    function getPushChain(r, c, dr, dc) {
+      const chain = [];
+      while (true) {
+        if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return null;
+        if (grid[r][c] === T_WALL) return null;
+        const ent = entityAt(r, c);
+        if (!ent) return chain;
+        chain.push(ent);
+        r += dr; c += dc;
+      }
+    }
+
     // === DOM 引用 ===
     const canvas = document.getElementById('map');
     const ctx = canvas.getContext('2d');
@@ -450,54 +463,47 @@
           e.preventDefault();
           const nr = hero.row + dir.dr;
           const nc = hero.col + dir.dc;
-          // 边界检查
+          // 边界 / 墙检查
           if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return;
-          // 墙体检查
           if (grid[nr][nc] === T_WALL) return;
 
           const prevRow = hero.row, prevCol = hero.col;
 
-          // 推箱子
-          const pushCrate = crateAt(nr, nc);
-          if (pushCrate) {
-            const cr = nr + dir.dr;
-            const cc = nc + dir.dc;
-            if (cr < 0 || cr >= GRID_SIZE || cc < 0 || cc >= GRID_SIZE) return;
-            if (isSolid(cr, cc)) return;
-            if (ball && ball.row === cr && ball.col === cc) return;
-            // 移动箱子到新位置
-            crates.delete(`${nr},${nc}`);
-            pushCrate.row = cr; pushCrate.col = cc;
-            crates.set(`${cr},${cc}`, pushCrate);
-            hero.row = nr; hero.col = nc;
-            // 推完箱子也要绳子跟随
-            if (!followBall(prevRow, prevCol)) {
-              // 回滚箱子
-              crates.delete(`${cr},${cc}`);
-              pushCrate.row = nr; pushCrate.col = nc;
-              crates.set(`${nr},${nc}`, pushCrate);
-              hero.row = prevRow; hero.col = prevCol;
-              ball.toggle();
-              render();
-              return;
+          // 链式推动：扫描目标方向上的连续实体
+          const chain = getPushChain(nr, nc, dir.dr, dir.dc);
+          if (chain === null) return; // 墙或出界阻塞
+
+          // 快照（followBall失败时回滚用）
+          const savedCrates = new Map();
+          for (const [k, v] of crates) savedCrates.set(k, new Crate(v.row, v.col, v.crateKey));
+          const savedBallRow = ball ? ball.row : null, savedBallCol = ball ? ball.col : null;
+
+          // 从后往前移动实体链（避免覆盖）
+          for (let i = chain.length - 1; i >= 0; i--) {
+            const ent = chain[i];
+            const newR = ent.row + dir.dr, newC = ent.col + dir.dc;
+            if (ent instanceof Crate) {
+              crates.delete(`${ent.row},${ent.col}`);
+              ent.row = newR; ent.col = newC;
+              crates.set(`${newR},${newC}`, ent);
+            } else {
+              ent.row = newR; ent.col = newC;
             }
-          // 推球
-          } else if (ball && ball.row === nr && ball.col === nc) {
-            const br = nr + dir.dr;
-            const bc = nc + dir.dc;
-            if (br < 0 || br >= GRID_SIZE || bc < 0 || bc >= GRID_SIZE) return;
-            if (isSolid(br, bc)) return;
-            ball.row = br; ball.col = bc;
-            hero.row = nr; hero.col = nc;
-          // 普通移动 + 绳子跟随
-          } else {
-            hero.row = nr; hero.col = nc;
-            if (!followBall(prevRow, prevCol)) {
-              hero.row = prevRow; hero.col = prevCol;
-              ball.toggle();
-              render();
-              return;
-            }
+          }
+
+          // 移动主角
+          hero.row = nr; hero.col = nc;
+
+          // 绳子跟随（球紧邻则立即返回true，否则尝试跟上）
+          if (!followBall(prevRow, prevCol)) {
+            // 回滚全部
+            crates.clear();
+            for (const [k, v] of savedCrates) crates.set(k, v);
+            if (ball) { ball.row = savedBallRow; ball.col = savedBallCol; }
+            hero.row = prevRow; hero.col = prevCol;
+            ball.toggle();
+            render();
+            return;
           }
 
           meltSnow();
