@@ -175,7 +175,11 @@ function drawCrateTile(crate) {
     return;
   }
   if (crate.crateKey === 'moth') {
-    drawMothTile(row, col, inset);
+    const foot = tileFootLevel(row, col);
+    const under = entityUnder(row, col, crate);
+    const groundH = under ? under.height + under.selfHeight : foot;
+    const hover = Math.max(0, crate.height - groundH);
+    drawMothTile(row, col, inset, hover);
     return;
   }
   const x = col * TILE_SIZE;
@@ -229,12 +233,27 @@ function drawSnowTile(row, col, inset = 1) {
   ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, w - 1);
 }
 
-function drawMothTile(row, col, inset = 1) {
+function drawMothTile(row, col, inset = 1, hover = 0) {
   const x = col * TILE_SIZE;
   const y = row * TILE_SIZE;
   const s = TILE_SIZE / 8;
-  const x0 = x + s * inset, y0 = y + s * inset, w = s * (8 - inset * 2);
+  // 悬空：每高度单位偏移 s*2 像素，最多 s*4
+  const hoverPx = Math.min(hover * s * 2, s * 4);
+  const x0 = x + s * inset, y_base = y + s * inset;
+  const y0 = y_base - hoverPx;
+  const w = s * (8 - inset * 2);
   const cx = x0 + w / 2, cy = y0 + w / 2;
+
+  // 悬空时画地面阴影
+  if (hover > 0) {
+    const shadowY = y_base + w / 2;
+    const shadowAlpha = Math.max(0.08, 0.25 - hover * 0.06);
+    const shadowScale = 1 - hover * 0.1;
+    ctx.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
+    ctx.beginPath();
+    ctx.ellipse(cx, shadowY, w * 0.3 * shadowScale, w * 0.1 * shadowScale, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
 
   // 翅膀（左右展开）
   ctx.fillStyle = '#d4c8a0';
