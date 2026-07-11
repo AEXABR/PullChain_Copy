@@ -367,8 +367,7 @@
           statusEl.textContent = `模式: 画斜角墙(${DIAG_SYMBOLS[currentDiagCorner]}缺口) — 点击/拖拽画布放置`;
           return;
         }
-        if ((b.dataset.mode === 'plate' || b.dataset.mode === 'liftwall') &&
-            (mode === 'plate' || mode === 'liftwall')) {
+        if (b.dataset.mode === mode && (mode === 'plate' || mode === 'liftwall')) {
           // 踏板/升降墙模式则循环切换 wireId
           const WIRE_IDS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
           const idx = WIRE_IDS.indexOf(currentWireId);
