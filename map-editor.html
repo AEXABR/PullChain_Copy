@@ -612,19 +612,32 @@
       return true;
     }
 
-    // 根据主角脚下实体更新逻辑高度：升降墙→1，球/箱子上方→底高+1，空地→0
-    function updateHeroHeight() {
-      if (!hero) return;
-      const r = hero.row, c = hero.col;
+    // 返回(r,c)处除self外的实体（用于判断脚下堆叠）
+    function entityUnder(r, c, self) {
+      if (ball && ball !== self && ball.row === r && ball.col === c) return ball;
+      if (hero && hero !== self && hero.row === r && hero.col === c) return hero;
+      const crate = crateAt(r, c);
+      if (crate && crate !== self) return crate;
+      return null;
+    }
+
+    // 更新单个实体逻辑高度：升降墙上→1，站在别的实体上→底高+1，空地→0
+    function updateEntityHeight(ent) {
+      if (!ent) return;
+      const r = ent.row, c = ent.col;
       if (liftWalls.has(K(r, c))) {
-        hero.height = 1;
-      } else if (ball && ball.row === r && ball.col === c) {
-        hero.height = ball.height + 1;
-      } else if (crateAt(r, c)) {
-        hero.height = crateAt(r, c).height + 1;
+        ent.height = 1;
       } else {
-        hero.height = 0;
+        const under = entityUnder(r, c, ent);
+        ent.height = under ? under.height + 1 : 0;
       }
+    }
+
+    // 自底向上更新全部实体高度：crate → ball → hero
+    function updateAllHeights() {
+      for (const crate of crates.values()) updateEntityHeight(crate);
+      if (ball) updateEntityHeight(ball);
+      if (hero) updateEntityHeight(hero);
     }
 
     // 升降墙更新：检查踏板，按类型决定升降
@@ -687,7 +700,7 @@
           if (tryMoveHero(dir.dr, dir.dc)) {
             meltSnow();
             updateLiftWalls();
-            updateHeroHeight();
+            updateAllHeights();
             statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +
               (ball ? `  球位置: (${ball.row}, ${ball.col}) [${ball.lightOn ? '💡开' : '🌑关'}]` : '') +
               (ball ? `  距离: ${dist(hero.row, hero.col, ball.row, ball.col)}` : '');
