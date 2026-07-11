@@ -868,7 +868,7 @@
     function drawCrateTile(crate) {
       const row = crate.row, col = crate.col;
       const stacked = entityUnder(row, col, crate) !== null; // 堆叠在其他实体上
-      const inset = stacked ? 3 : 2; // 平常内缩2圈，堆叠再缩1圈
+      const inset = stacked ? 3 : 1; // 平常内缩1圈，堆叠再缩2圈
       if (crate.crateKey === 'snow') {
         drawSnowTile(row, col, inset);
         return;
@@ -912,7 +912,7 @@
       ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, w - 1);
     }
 
-    function drawSnowTile(row, col, inset = 2) {
+    function drawSnowTile(row, col, inset = 1) {
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
       const s = TILE_SIZE / 8;
