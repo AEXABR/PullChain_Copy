@@ -950,15 +950,24 @@
           ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
         }
       } else {
-        // 下降态：半高虚线
-        ctx.strokeStyle = '#887777';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([2, 2]);
-        ctx.strokeRect(x + 2, y + TILE_SIZE / 2, TILE_SIZE - 4, TILE_SIZE / 2 - 2);
-        ctx.setLineDash([]);
-        // 底部横条（实体支撑）
-        ctx.fillStyle = '#665555';
-        ctx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
+        // 下降态：半高虚线（颜色按类型区分）
+        if (type === 'up') {
+          ctx.strokeStyle = '#7788BB';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 2]);
+          ctx.strokeRect(x + 2, y + TILE_SIZE / 2, TILE_SIZE - 4, TILE_SIZE / 2 - 2);
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#5566AA';
+          ctx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
+        } else {
+          ctx.strokeStyle = '#887777';
+          ctx.lineWidth = 1;
+          ctx.setLineDash([2, 2]);
+          ctx.strokeRect(x + 2, y + TILE_SIZE / 2, TILE_SIZE - 4, TILE_SIZE / 2 - 2);
+          ctx.setLineDash([]);
+          ctx.fillStyle = '#665555';
+          ctx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
+        }
       }
     }
 
