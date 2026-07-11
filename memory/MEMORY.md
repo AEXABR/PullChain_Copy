@@ -1,0 +1,7 @@
+- [项目总览](project-overview.md) — PullChain 是什么、技术栈、核心概念速览
+- [Entity 系统](entity-system.md) — Hero/Ball/Crate 类体系、grid 存储、快照回滚
+- [移动逻辑](movement-logic.md) — tryMoveHero 全流程、getPushChain/pushChain、回滚机制
+- [球跟随逻辑](followball-logic.md) — 绳子约束、斜角推箱、两轮候选遍历
+- [箱子系统](crate-system.md) — 木箱/雪块、融雪机制、水地块
+- [编辑器模式](editor-modes.md) — 六种模式、模式分发、setTile 副作用
+- [渲染系统](render-system.md) — 分层绘制顺序、各 tile 绘制函数
