@@ -399,6 +399,7 @@ document.addEventListener('keydown', (e) => {
       e.preventDefault();
       if (tryMoveHero(dir.dr, dir.dc)) {
         meltSnow();
+        moveMoths();
         updateLiftWalls();
         updateAllHeights();
         statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +

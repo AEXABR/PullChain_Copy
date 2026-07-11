@@ -174,6 +174,10 @@ function drawCrateTile(crate) {
     drawSnowTile(row, col, inset);
     return;
   }
+  if (crate.crateKey === 'moth') {
+    drawMothTile(row, col, inset);
+    return;
+  }
   const x = col * TILE_SIZE;
   const y = row * TILE_SIZE;
   const s = TILE_SIZE / 8;
@@ -223,6 +227,57 @@ function drawSnowTile(row, col, inset = 1) {
   ctx.strokeStyle = '#8ab8d0';
   ctx.lineWidth = 1;
   ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, w - 1);
+}
+
+function drawMothTile(row, col, inset = 1) {
+  const x = col * TILE_SIZE;
+  const y = row * TILE_SIZE;
+  const s = TILE_SIZE / 8;
+  const x0 = x + s * inset, y0 = y + s * inset, w = s * (8 - inset * 2);
+  const cx = x0 + w / 2, cy = y0 + w / 2;
+
+  // 翅膀（左右展开）
+  ctx.fillStyle = '#d4c8a0';
+  ctx.beginPath();
+  ctx.ellipse(cx - w * 0.3, cy - w * 0.1, w * 0.35, w * 0.22, -0.3, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + w * 0.3, cy - w * 0.1, w * 0.35, w * 0.22, 0.3, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 下翅（稍小）
+  ctx.fillStyle = '#c8b890';
+  ctx.beginPath();
+  ctx.ellipse(cx - w * 0.22, cy + w * 0.12, w * 0.28, w * 0.18, -0.2, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.ellipse(cx + w * 0.22, cy + w * 0.12, w * 0.28, w * 0.18, 0.2, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 身体
+  ctx.fillStyle = '#8B7355';
+  ctx.fillRect(cx - w * 0.06, cy - w * 0.3, w * 0.12, w * 0.6);
+
+  // 触角
+  ctx.strokeStyle = '#6B5B3A';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(cx - w * 0.04, cy - w * 0.28);
+  ctx.quadraticCurveTo(cx - w * 0.15, cy - w * 0.45, cx - w * 0.2, cy - w * 0.35);
+  ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(cx + w * 0.04, cy - w * 0.28);
+  ctx.quadraticCurveTo(cx + w * 0.15, cy - w * 0.45, cx + w * 0.2, cy - w * 0.35);
+  ctx.stroke();
+
+  // 翅膀花纹
+  ctx.fillStyle = 'rgba(139, 115, 85, 0.3)';
+  ctx.beginPath();
+  ctx.arc(cx - w * 0.32, cy - w * 0.12, w * 0.1, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.beginPath();
+  ctx.arc(cx + w * 0.32, cy - w * 0.12, w * 0.1, 0, Math.PI * 2);
+  ctx.fill();
 }
 
 // === 渲染：踏板 ===

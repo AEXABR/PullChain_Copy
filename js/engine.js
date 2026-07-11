@@ -36,6 +36,7 @@ class Crate extends Entity {
 const CRATES = {
   wood: { name: '木箱', emoji: '📦' },
   snow: { name: '雪块', emoji: '❄️' },
+  moth: { name: '飞蛾', emoji: '🦋' },
 };
 
 // === 斜角墙常量 ===
@@ -196,6 +197,8 @@ function tileFootLevel(r, c) {
 // 更新单个实体脚底高度：格子高度，或站在别的实体上→底高+该实体自身高度
 function updateEntityHeight(ent) {
   if (!ent) return;
+  // 飞蛾高度不变
+  if (ent instanceof Crate && ent.crateKey === 'moth') return;
   const r = ent.row, c = ent.col;
   const under = entityUnder(r, c, ent);
   if (under) {
@@ -262,6 +265,81 @@ function meltSnow() {
       const [wr, wc] = waterKey.split(',').map(Number);
       grid[wr][wc].hasWater = true;
     }
+  }
+}
+
+// === 视线检测（同行或同列直线，遇墙阻断） ===
+function hasLineOfSight(r1, c1, r2, c2) {
+  if (r1 !== r2 && c1 !== c2) return false;
+  if (r1 === r2) {
+    const minC = Math.min(c1, c2);
+    const maxC = Math.max(c1, c2);
+    for (let c = minC + 1; c < maxC; c++) {
+      if (grid[r1][c].base === T_WALL) return false;
+    }
+  } else {
+    const minR = Math.min(r1, r2);
+    const maxR = Math.max(r1, r2);
+    for (let r = minR + 1; r < maxR; r++) {
+      if (grid[r][c1].base === T_WALL) return false;
+    }
+  }
+  return true;
+}
+
+// === 飞蛾自主移动 ===
+function moveMoths() {
+  if (!ball || !ball.lightOn) return;
+
+  // 先收集所有飞蛾，避免迭代中修改 Map 导致重复移动
+  const moths = [];
+  for (const [key, crate] of crates) {
+    if (crate.crateKey === 'moth' && !key.endsWith(':1')) {
+      moths.push({ key, crate });
+    }
+  }
+
+  for (const { key, crate } of moths) {
+    // 飞蛾可能已被其他操作移除（如融化导致底层消失？不会影响飞蛾）
+    if (!crates.has(key)) continue;
+
+    const { row, col, height } = crate;
+
+    // 不在同一行或同一列
+    if (row !== ball.row && col !== ball.col) continue;
+
+    // 检查视线
+    if (!hasLineOfSight(row, col, ball.row, ball.col)) continue;
+
+    // 计算方向
+    const dr = Math.sign(ball.row - row);
+    const dc = Math.sign(ball.col - col);
+
+    // 已与球重合
+    if (dr === 0 && dc === 0) continue;
+
+    const nr = row + dr;
+    const nc = col + dc;
+
+    // 越界检查
+    if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
+
+    // 目标格是墙 → 挡住
+    if (grid[nr][nc].base === T_WALL) continue;
+
+    // 目标格有实体且顶面高于飞蛾 → 挡住
+    const destEnt = entityAt(nr, nc);
+    if (destEnt && destEnt.height + destEnt.selfHeight > height) continue;
+
+    // 目标格已有底层箱子 → 不堆叠，挡住
+    if (crates.has(K(nr, nc))) continue;
+
+    // 移动飞蛾：更新 crates Map
+    crates.delete(key);
+    crate.row = nr;
+    crate.col = nc;
+    crates.set(K(nr, nc), crate);
+    // 高度不变（飞蛾特性）
   }
 }
 
