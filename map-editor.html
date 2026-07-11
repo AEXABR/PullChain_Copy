@@ -84,6 +84,7 @@
     <button id="btn-web" data-mode="web">🕸 蜘蛛网 [8]</button>
     <button id="btn-plate" data-mode="plate">▫ 踏板 [9]</button>
     <button id="btn-liftwall" data-mode="liftwall">⇅ 升降墙 [0]</button>
+    <button id="btn-wire" data-mode="wire">🔗 引线 [-]</button>
     <button id="btn-play" data-mode="play">▶ 操控 [4]</button>
     <button id="btn-clear">🗺 清空</button>
     <button id="btn-export">💾 导出</button>
@@ -181,10 +182,11 @@
     const btnWeb = document.getElementById('btn-web');
     const btnPlate = document.getElementById('btn-plate');
     const btnLiftwall = document.getElementById('btn-liftwall');
+    const btnWire = document.getElementById('btn-wire');
     const btnPlay = document.getElementById('btn-play');
     const btnExport = document.getElementById('btn-export');
     const btnClear = document.getElementById('btn-clear');
-    const allBtns = [btnWall, btnDiag, btnErase, btnHero, btnBall, btnCrate, btnWeb, btnPlate, btnLiftwall, btnPlay];
+    const allBtns = [btnWall, btnDiag, btnErase, btnHero, btnBall, btnCrate, btnWeb, btnPlate, btnLiftwall, btnWire, btnPlay];
 
     // === 状态 ===
     let mode = 'wall';          // 'wall' | 'erase' | 'place_hero' | 'place_ball' | 'play'
@@ -196,9 +198,10 @@
     let currentDiagCorner = 'TL';  // 当前斜角墙缺口朝向
     let waterTiles = new Set();  // 有水贴图的空地坐标 "row,col"
     let webTiles = new Set();    // 有蜘蛛网的空地坐标 "row,col"
-    const plateTiles = new Map(); // "row,col" → wireId  踏板
-    const liftWalls = new Map();  // "row,col" → wireId  升降墙
-    let currentWireId = 'A';      // 当前连线 ID
+    const plateTiles = new Set(); // 踏板位置 "row,col"
+    const liftWalls = new Set();  // 升降墙位置 "row,col"
+    const wireLinks = [];         // [{plate: "r,c", wall: "r,c"}, ...]
+    let wireStart = null;         // 引线模式：选中的踏板key
     const diagCorners = new Map(); // "row,col" → 'TL'|'TR'|'BL'|'BR'  斜角墙缺口朝向
     let isDrawing = false;      // 鼠标拖拽中
     let hoverCell = null;       // {row, col} | null  鼠标悬停格子
@@ -241,6 +244,14 @@
         webTiles.delete(K(row, col));
         plateTiles.delete(K(row, col));
         liftWalls.delete(K(row, col));
+        // 清理相关引线
+        const key = K(row, col);
+        for (let i = wireLinks.length - 1; i >= 0; i--) {
+          if (wireLinks[i].plate === key || wireLinks[i].wall === key) {
+            wireLinks.splice(i, 1);
+          }
+        }
+        if (wireStart === key) wireStart = null;
         diagCorners.delete(K(row, col));
       }
       if (grid[row][col] === value) return;
@@ -253,6 +264,28 @@
       isDrawing = true;
       const cell = getCellFromEvent(e);
       if (!cell) return;
+
+      // 引线模式特殊处理
+      if (mode === 'wire') {
+        const key = K(cell.row, cell.col);
+        if (plateTiles.has(key)) {
+          wireStart = key;
+          statusEl.textContent = `🔗 已选踏板(${key}) — 点击升降墙完成连线`;
+          render();
+          return;
+        }
+        if (liftWalls.has(key) && wireStart) {
+          wireLinks.push({ plate: wireStart, wall: key });
+          statusEl.textContent = `🔗 引线已连接: ${wireStart} → ${key}`;
+          wireStart = null;
+          render();
+          return;
+        }
+        wireStart = null;
+        statusEl.textContent = '模式: 引线 — 点击踏板然后点击升降墙连线';
+        render();
+        return;
+      }
 
       const placeActions = {
         wall:        () => setTile(cell.row, cell.col, T_WALL),
@@ -272,7 +305,7 @@
       const cell = getCellFromEvent(e);
       hoverCell = cell;
 
-      if (mode === 'place_hero' || mode === 'place_ball' || mode === 'place_crate' || mode === 'web' || mode === 'plate' || mode === 'liftwall') {
+      if (mode === 'place_hero' || mode === 'place_ball' || mode === 'place_crate' || mode === 'web' || mode === 'plate' || mode === 'liftwall' || mode === 'wire') {
         render();
         return;
       }
@@ -318,21 +351,21 @@
         'place_ball':  '模式: 放置球 — 点击空地放置球（不能和角色/箱子同格）',
         'place_crate': `模式: 放置${CRATES[currentCrateKey].name} — 点击空地放置`,
         'web':         '模式: 蜘蛛网 — 点击/拖拽在空地上放置蜘蛛网',
-        'plate':       () => `模式: 踏板[${currentWireId}] — 点击空地放置踏板`,
-        'liftwall':    () => `模式: 升降墙[${currentWireId}] — 点击空地放置升降墙`,
+        'plate':       '模式: 踏板 — 点击空地放置踏板',
+        'liftwall':    '模式: 升降墙 — 点击空地放置升降墙',
+        'wire':        '模式: 引线 — 点击踏板然后点击升降墙连线',
         'play':        '模式: 操控 — 方向键/WASD 移动角色'
       };
       const activeBtns = {
         'wall': btnWall, 'diag': btnDiag, 'erase': btnErase,
-        'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'web': btnWeb, 'plate': btnPlate, 'liftwall': btnLiftwall, 'play': btnPlay
+        'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'web': btnWeb, 'plate': btnPlate, 'liftwall': btnLiftwall, 'wire': btnWire, 'play': btnPlay
       };
 
       activeBtns[newMode].classList.add('active');
       if (newMode === 'place_crate') updateCrateBtn();
       if (newMode === 'diag') updateDiagBtn();
-      if (newMode === 'plate' || newMode === 'liftwall') updateWireBtns();
-      const label = modeLabels[newMode];
-      statusEl.textContent = typeof label === 'function' ? label() : label;
+      if (newMode === 'wire') wireStart = null;
+      statusEl.textContent = modeLabels[newMode];
       render();
     }
 
@@ -367,23 +400,8 @@
           statusEl.textContent = `模式: 画斜角墙(${DIAG_SYMBOLS[currentDiagCorner]}缺口) — 点击/拖拽画布放置`;
           return;
         }
-        if (b.dataset.mode === mode && (mode === 'plate' || mode === 'liftwall')) {
-          // 踏板/升降墙模式则循环切换 wireId
-          const WIRE_IDS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-          const idx = WIRE_IDS.indexOf(currentWireId);
-          currentWireId = WIRE_IDS[(idx + 1) % WIRE_IDS.length];
-          updateWireBtns();
-          const lbl = modeLabels[mode];
-          statusEl.textContent = typeof lbl === 'function' ? lbl() : lbl;
-          return;
-        }
         setMode(b.dataset.mode);
       }));
-
-    function updateWireBtns() {
-      btnPlate.textContent = `▫ 踏板[${currentWireId}] [9]`;
-      btnLiftwall.textContent = `⇅ 升降墙[${currentWireId}] [0]`;
-    }
 
     // === 导出 ===
     function exportMap() {
@@ -401,8 +419,9 @@
         heroStart: hero ? { row: hero.row, col: hero.col } : null,
         ballStart: ball ? { row: ball.row, col: ball.col } : null,
         webTiles: [...webTiles],
-        plateTiles: Object.fromEntries(plateTiles),
-        liftWalls: Object.fromEntries(liftWalls)
+        plateTiles: [...plateTiles],
+        liftWalls: [...liftWalls],
+        wireLinks: wireLinks
       };
 
       const json = JSON.stringify(data, null, 2);
@@ -434,7 +453,8 @@
       webTiles.clear();
       plateTiles.clear();
       liftWalls.clear();
-      currentWireId = 'A';
+      wireLinks.length = 0;
+      wireStart = null;
       diagCorners.clear();
       updateCrateBtn();
       statusEl.textContent = '🗺 地图已清空';
@@ -569,22 +589,24 @@
 
     // 升降墙更新：检查踏板，全部踩下则升起
     function updateLiftWalls() {
-      // 按 wireId 分组踏板
-      const plateGroups = new Map(); // wireId → [{row,col}, ...]
-      for (const [key, id] of plateTiles) {
-        if (!plateGroups.has(id)) plateGroups.set(id, []);
-        const [r, c] = key.split(',').map(Number);
-        plateGroups.get(id).push({ row: r, col: c });
+      // 为每个升降墙收集其连接的所有踏板
+      const wallPlates = new Map(); // wallKey → Set of plateKeys
+      for (const wkey of liftWalls) {
+        wallPlates.set(wkey, new Set());
       }
-      // 判断每组是否全部踩下
-      const raisedIds = new Set();
-      for (const [id, plates] of plateGroups) {
-        if (plates.every(p => entityAt(p.row, p.col) !== null)) raisedIds.add(id);
+      for (const link of wireLinks) {
+        if (wallPlates.has(link.wall)) {
+          wallPlates.get(link.wall).add(link.plate);
+        }
       }
-      // 更新升降墙
-      for (const [key, id] of liftWalls) {
-        const [wr, wc] = key.split(',').map(Number);
-        if (raisedIds.has(id)) {
+      // 判断每个墙是否应升起（所有连接的踏板都被踩下，且至少有1个连接）
+      for (const [wkey, plates] of wallPlates) {
+        const [wr, wc] = wkey.split(',').map(Number);
+        const allPressed = plates.size > 0 && [...plates].every(pk => {
+          const [pr, pc] = pk.split(',').map(Number);
+          return entityAt(pr, pc) !== null;
+        });
+        if (allPressed) {
           if (grid[wr][wc] !== T_WALL) {
             grid[wr][wc] = T_WALL;
             const ent = entityAt(wr, wc);
@@ -619,7 +641,7 @@
       'ArrowLeft':{dr:0,dc:-1},'a':{dr:0,dc:-1},'A':{dr:0,dc:-1},
       'ArrowRight':{dr:0,dc:1},'d':{dr:0,dc:1},'D':{dr:0,dc:1},
     };
-    const KEY_MODE = { '1':'wall','2':'erase','3':'place_hero','4':'play','5':'place_ball','6':'place_crate','7':'diag','8':'web','9':'plate','0':'liftwall' };
+    const KEY_MODE = { '1':'wall','2':'erase','3':'place_hero','4':'play','5':'place_ball','6':'place_crate','7':'diag','8':'web','9':'plate','0':'liftwall','-':'wire' };
 
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -891,33 +913,35 @@
     }
 
     function drawWires() {
-      // 按 wireId 分组踏板和升降墙
-      const groups = new Map(); // wireId → { plates: [[r,c],...], walls: [[r,c],...] }
-      for (const [key, id] of plateTiles) {
-        if (!groups.has(id)) groups.set(id, { plates: [], walls: [] });
-        const [r, c] = key.split(',').map(Number);
-        groups.get(id).plates.push([r, c]);
-      }
-      for (const [key, id] of liftWalls) {
-        if (!groups.has(id)) groups.set(id, { plates: [], walls: [] });
-        const [r, c] = key.split(',').map(Number);
-        groups.get(id).walls.push([r, c]);
-      }
-
       ctx.strokeStyle = 'rgba(255, 220, 50, 0.55)';
       ctx.lineWidth = 1.5;
-      for (const [, group] of groups) {
-        for (const [pr, pc] of group.plates) {
-          for (const [wr, wc] of group.walls) {
-            const px = pc * TILE_SIZE + TILE_SIZE / 2;
-            const py = pr * TILE_SIZE + TILE_SIZE / 2;
-            const wx = wc * TILE_SIZE + TILE_SIZE / 2;
-            const wy = wr * TILE_SIZE + TILE_SIZE / 2;
-            ctx.beginPath();
-            ctx.moveTo(px, py);
-            ctx.lineTo(wx, wy);
-            ctx.stroke();
-          }
+      for (const link of wireLinks) {
+        const [pr, pc] = link.plate.split(',').map(Number);
+        const [wr, wc] = link.wall.split(',').map(Number);
+        const px = pc * TILE_SIZE + TILE_SIZE / 2;
+        const py = pr * TILE_SIZE + TILE_SIZE / 2;
+        const wx = wc * TILE_SIZE + TILE_SIZE / 2;
+        const wy = wr * TILE_SIZE + TILE_SIZE / 2;
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(wx, wy);
+        ctx.stroke();
+      }
+      // 引线模式：正在画线时画预览线
+      if (mode === 'wire' && wireStart) {
+        const [sr, sc] = wireStart.split(',').map(Number);
+        const sx = sc * TILE_SIZE + TILE_SIZE / 2;
+        const sy = sr * TILE_SIZE + TILE_SIZE / 2;
+        if (hoverCell) {
+          const hx = hoverCell.col * TILE_SIZE + TILE_SIZE / 2;
+          const hy = hoverCell.row * TILE_SIZE + TILE_SIZE / 2;
+          ctx.strokeStyle = 'rgba(255, 220, 50, 0.35)';
+          ctx.setLineDash([3, 3]);
+          ctx.beginPath();
+          ctx.moveTo(sx, sy);
+          ctx.lineTo(hx, hy);
+          ctx.stroke();
+          ctx.setLineDash([]);
         }
       }
     }
@@ -1022,9 +1046,9 @@
         statusEl.textContent = '⚠ 不能把踏板放在墙体上！';
         return;
       }
-      plateTiles.set(K(row, col), currentWireId);
+      plateTiles.add(K(row, col));
       render();
-      statusEl.textContent = `▫ 踏板[${currentWireId}]已放置`;
+      statusEl.textContent = '▫ 踏板已放置';
     }
 
     function placeLiftWall(row, col) {
@@ -1032,9 +1056,9 @@
         statusEl.textContent = '⚠ 此处已有墙体！';
         return;
       }
-      liftWalls.set(K(row, col), currentWireId);
+      liftWalls.add(K(row, col));
       render();
-      statusEl.textContent = `⇅ 升降墙[${currentWireId}]已放置(下降态)`;
+      statusEl.textContent = '⇅ 升降墙已放置(下降态)';
     }
 
     // === 绳子 ===
@@ -1203,7 +1227,7 @@
         }
       }
       // 4. 踏板
-      for (const [key] of plateTiles) {
+      for (const key of plateTiles) {
         const [r, c] = key.split(',').map(Number);
         drawPlateTile(r, c);
       }
@@ -1242,6 +1266,9 @@
         const y = row * TILE_SIZE;
         const blocked = (mode === 'web' || mode === 'plate' || mode === 'liftwall')
           ? grid[row][col] === T_WALL
+          : mode === 'wire'
+          ? !wireStart ? !plateTiles.has(K(row, col))
+            : !liftWalls.has(K(row, col))
           : isSolid(row, col) ||
             (mode === 'place_hero' && ball && ball.row === row && ball.col === col) ||
             (mode === 'place_ball' && hero && hero.row === row && hero.col === col);
@@ -1264,9 +1291,6 @@
         drawHero(hero);
       }
     }
-
-    // 初始按钮文字
-    updateWireBtns();
 
     // 首次渲染
     render();
