@@ -152,7 +152,7 @@
       let stepHeight = pusherHeight; // 尝试踩上该位置实体的脚底高度
       while (true) {
         if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return null;
-        if (grid[r][c] === T_WALL) return null;
+        if (grid[r][c] === T_WALL && !(liftWalls.has(K(r, c)) && stepHeight >= tileFootLevel(r, c))) return null;
         const ent = entityForPush(r, c);
         if (ent && webTiles.has(K(r, c))) return null;
         if (!ent) return chain;
@@ -572,7 +572,9 @@
           if (!isValid(c)) continue;
           const ent = entityForPush(c.row, c.col);
           const canStep = !ent || ball.height > ent.height + ent.selfHeight;
-          if (canStep && grid[c.row][c.col] !== T_WALL) {
+          const targetFoot = tileFootLevel(c.row, c.col);
+          const canAccess = grid[c.row][c.col] !== T_WALL || (liftWalls.has(K(c.row, c.col)) && ball.height >= targetFoot);
+          if (canStep && canAccess) {
             ball.row = c.row; ball.col = c.col;
             break;
           }
@@ -609,8 +611,8 @@
         return true;
       }
 
-      // 站上升降墙（墙顶高度 = tileFootLevel，主角同高度可站上）
-      if (grid[nr][nc] === T_WALL && liftWalls.has(K(nr, nc))) {
+      // 站上升降墙（仅当目标格无实体时；有实体则留给下方推链处理）
+      if (grid[nr][nc] === T_WALL && liftWalls.has(K(nr, nc)) && !targetEnt) {
         const prevRow = hero.row, prevCol = hero.col;
         hero.row = nr; hero.col = nc;
         if (!followBall(prevRow, prevCol)) {
