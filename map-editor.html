@@ -81,6 +81,7 @@
     <button id="btn-hero" data-mode="place_hero">🧍 放角色 [3]</button>
     <button id="btn-ball" data-mode="place_ball">🟡 放球 [5]</button>
     <button id="btn-crate" data-mode="place_crate">📦 放箱子 [6]</button>
+    <button id="btn-web" data-mode="web">🕸 蜘蛛网 [8]</button>
     <button id="btn-play" data-mode="play">▶ 操控 [4]</button>
     <button id="btn-clear">🗺 清空</button>
     <button id="btn-export">💾 导出</button>
@@ -143,6 +144,7 @@
         if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return null;
         if (grid[r][c] === T_WALL) return null;
         const ent = entityAt(r, c);
+        if (ent && webTiles.has(K(r, c))) return null;
         if (!ent) return chain;
         chain.push(ent);
         r += dr; c += dc;
@@ -174,10 +176,11 @@
     const btnHero = document.getElementById('btn-hero');
     const btnBall = document.getElementById('btn-ball');
     const btnCrate = document.getElementById('btn-crate');
+    const btnWeb = document.getElementById('btn-web');
     const btnPlay = document.getElementById('btn-play');
     const btnExport = document.getElementById('btn-export');
     const btnClear = document.getElementById('btn-clear');
-    const allBtns = [btnWall, btnDiag, btnErase, btnHero, btnBall, btnCrate, btnPlay];
+    const allBtns = [btnWall, btnDiag, btnErase, btnHero, btnBall, btnCrate, btnWeb, btnPlay];
 
     // === 状态 ===
     let mode = 'wall';          // 'wall' | 'erase' | 'place_hero' | 'place_ball' | 'play'
@@ -188,6 +191,7 @@
     let currentCrateKey = 'wood'; // 当前选中的箱子类型
     let currentDiagCorner = 'TL';  // 当前斜角墙缺口朝向
     let waterTiles = new Set();  // 有水贴图的空地坐标 "row,col"
+    let webTiles = new Set();    // 有蜘蛛网的空地坐标 "row,col"
     const diagCorners = new Map(); // "row,col" → 'TL'|'TR'|'BL'|'BR'  斜角墙缺口朝向
     let isDrawing = false;      // 鼠标拖拽中
     let hoverCell = null;       // {row, col} | null  鼠标悬停格子
@@ -227,6 +231,7 @@
           crates.delete(K(row, col));
         }
         waterTiles.delete(K(row, col));
+        webTiles.delete(K(row, col));
         diagCorners.delete(K(row, col));
       }
       if (grid[row][col] === value) return;
@@ -247,6 +252,7 @@
         place_hero:  () => placeHero(cell.row, cell.col),
         place_ball:  () => placeBall(cell.row, cell.col),
         place_crate: () => placeCrate(cell.row, cell.col),
+        web:         () => placeWeb(cell.row, cell.col),
       };
       if (placeActions[mode]) placeActions[mode]();
     }
@@ -255,7 +261,7 @@
       const cell = getCellFromEvent(e);
       hoverCell = cell;
 
-      if (mode === 'place_hero' || mode === 'place_ball' || mode === 'place_crate') {
+      if (mode === 'place_hero' || mode === 'place_ball' || mode === 'place_crate' || mode === 'web') {
         render();
         return;
       }
@@ -267,6 +273,7 @@
         wall:  () => setTile(cell.row, cell.col, T_WALL),
         diag:  () => placeDiagWall(cell.row, cell.col),
         erase: () => setTile(cell.row, cell.col, T_EMPTY),
+        web:   () => placeWeb(cell.row, cell.col),
       };
       if (dragActions[mode]) dragActions[mode]();
     }
@@ -297,11 +304,12 @@
         'place_hero':  '模式: 放置角色 — 点击空地放置角色',
         'place_ball':  '模式: 放置球 — 点击空地放置球（不能和角色/箱子同格）',
         'place_crate': `模式: 放置${CRATES[currentCrateKey].name} — 点击空地放置`,
+        'web':         '模式: 蜘蛛网 — 点击/拖拽在空地上放置蜘蛛网',
         'play':        '模式: 操控 — 方向键/WASD 移动角色'
       };
       const activeBtns = {
         'wall': btnWall, 'diag': btnDiag, 'erase': btnErase,
-        'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'play': btnPlay
+        'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'web': btnWeb, 'play': btnPlay
       };
 
       activeBtns[newMode].classList.add('active');
@@ -359,7 +367,8 @@
         tiles: tiles,
         diagCorners: diagData,
         heroStart: hero ? { row: hero.row, col: hero.col } : null,
-        ballStart: ball ? { row: ball.row, col: ball.col } : null
+        ballStart: ball ? { row: ball.row, col: ball.col } : null,
+        webTiles: [...webTiles]
       };
 
       const json = JSON.stringify(data, null, 2);
@@ -388,6 +397,7 @@
       crates.clear();
       currentCrateKey = 'wood';
       waterTiles.clear();
+      webTiles.clear();
       diagCorners.clear();
       updateCrateBtn();
       statusEl.textContent = '🗺 地图已清空';
@@ -487,6 +497,7 @@
 
     // 尝试移动主角：快照→推箱→移动→跟随→失败回滚。返回 true=成功
     function tryMoveHero(dr, dc) {
+      if (webTiles.has(K(hero.row, hero.col))) return false; // 被蜘蛛网困住
       const nr = hero.row + dr, nc = hero.col + dc;
 
       // 边界 / 墙检查
@@ -537,7 +548,7 @@
       'ArrowLeft':{dr:0,dc:-1},'a':{dr:0,dc:-1},'A':{dr:0,dc:-1},
       'ArrowRight':{dr:0,dc:1},'d':{dr:0,dc:1},'D':{dr:0,dc:1},
     };
-    const KEY_MODE = { '1':'wall','2':'erase','3':'place_hero','4':'play','5':'place_ball','6':'place_crate','7':'diag' };
+    const KEY_MODE = { '1':'wall','2':'erase','3':'place_hero','4':'play','5':'place_ball','6':'place_crate','7':'diag','8':'web' };
 
     document.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
@@ -776,6 +787,40 @@
       ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
     }
 
+    function drawWebTile(row, col) {
+      const x = col * TILE_SIZE;
+      const y = row * TILE_SIZE;
+      const s = TILE_SIZE / 8;
+      const cx = x + TILE_SIZE / 2;
+      const cy = y + TILE_SIZE / 2;
+
+      // 空地底色
+      ctx.fillStyle = '#3a3a4e';
+      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+
+      // 八角辐射蛛丝
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)';
+      ctx.lineWidth = 1;
+      const dirs = [[0,-1],[1,-1],[1,0],[1,1],[0,1],[-1,1],[-1,0],[-1,-1]];
+      for (const [dr, dc] of dirs) {
+        ctx.beginPath();
+        ctx.moveTo(cx, cy);
+        ctx.lineTo(cx + dc * s * 3.5, cy + dr * s * 3.5);
+        ctx.stroke();
+      }
+
+      // 螺旋连接环
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.10)';
+      for (let i = 1; i <= 3; i++) {
+        const r = s * i;
+        ctx.strokeRect(cx - r, cy - r, r * 2, r * 2);
+      }
+
+      // 中心点
+      ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.fillRect(cx - 1, cy - 1, 2, 2);
+    }
+
     function placeDiagWall(row, col) {
       if (isSolid(row, col)) {
         // 允许覆盖已有的斜角墙（更改缺口朝向）或普通墙（升级为斜角墙）
@@ -803,6 +848,17 @@
       crates.set(K(row, col), new Crate(row, col, currentCrateKey));
       statusEl.textContent = `${type.emoji} ${type.name}已放置`;
       render();
+    }
+
+    function placeWeb(row, col) {
+      if (grid[row][col] === T_WALL) {
+        statusEl.textContent = '⚠ 不能把蜘蛛网放在墙体上！';
+        return;
+      }
+      waterTiles.delete(K(row, col));
+      webTiles.add(K(row, col));
+      render();
+      statusEl.textContent = '🕸 蜘蛛网已放置';
     }
 
     // === 绳子 ===
@@ -964,6 +1020,8 @@
             }
           } else if (waterTiles.has(K(r, c))) {
             drawWaterTile(r, c);
+          } else if (webTiles.has(K(r, c))) {
+            drawWebTile(r, c);
           } else {
             drawEmptyTile(r, c);
           }
@@ -979,13 +1037,15 @@
       drawGridLines();
 
       // 3. 悬停高亮
-      if ((mode === 'place_hero' || mode === 'place_ball' || mode === 'place_crate') && hoverCell) {
+      if ((mode === 'place_hero' || mode === 'place_ball' || mode === 'place_crate' || mode === 'web') && hoverCell) {
         const { row, col } = hoverCell;
         const x = col * TILE_SIZE;
         const y = row * TILE_SIZE;
-        const blocked = isSolid(row, col) ||
-          (mode === 'place_hero' && ball && ball.row === row && ball.col === col) ||
-          (mode === 'place_ball' && hero && hero.row === row && hero.col === col);
+        const blocked = mode === 'web'
+          ? grid[row][col] === T_WALL
+          : isSolid(row, col) ||
+            (mode === 'place_hero' && ball && ball.row === row && ball.col === col) ||
+            (mode === 'place_ball' && hero && hero.row === row && hero.col === col);
         if (blocked) {
           ctx.fillStyle = 'rgba(255, 60, 60, 0.4)';
         } else {
