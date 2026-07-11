@@ -157,7 +157,7 @@
 
     // === 状态 ===
     let mode = 'wall';          // 'wall' | 'erase' | 'place_hero' | 'place_ball' | 'play'
-    let grid = [];              // grid[row][col]: 0=空地, 1=墙体, >=2=箱子(见CRATES)
+    let grid = [];              // grid[row][col]: 0=空地, 1=墙体
     let hero = null;             // Hero | null
     let ball = null;             // Ball | null
     const crates = new Map();    // "row,col" -> Crate
