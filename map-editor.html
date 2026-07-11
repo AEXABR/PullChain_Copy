@@ -112,18 +112,28 @@
 
     // === 箱子注册表（扩展新箱子只需在这里加一项） ===
     const CRATES = {
-      wood: { id: 2, name: '木箱', emoji: '📦', pushable: true },
-      snow: { id: 3, name: '雪块', emoji: '❄️', pushable: true },
+      wood: { name: '木箱', emoji: '📦' },
+      snow: { name: '雪块', emoji: '❄️' },
     };
 
     // 工具函数
-    function crateAt(r, c)     { return crates.get(`${r},${c}`) || null; }
+    const K = (r, c) => `${r},${c}`;
+    const dist = (r1, c1, r2, c2) => Math.max(Math.abs(r1 - r2), Math.abs(c1 - c2));
+    function crateAt(r, c)     { return crates.get(K(r, c)) || null; }
     function entityAt(r, c) {
       if (hero && hero.row === r && hero.col === c) return hero;
       if (ball && ball.row === r && ball.col === c) return ball;
       return crateAt(r, c);
     }
     function isSolid(r, c)     { return grid[r][c] === T_WALL || crateAt(r, c) !== null; }
+
+    // crates快照（回滚用）
+    function snapshotCrates() {
+      const snap = new Map();
+      for (const [k, v] of crates) snap.set(k, new Crate(v.row, v.col, v.crateKey));
+      return snap;
+    }
+    function restoreCrates(snap) { crates.clear(); for (const [k, v] of snap) crates.set(k, v); }
 
     // 链式推动：从(r,c)沿(dr,dc)扫描，返回可推动的实体链。null=阻塞
     function getPushChain(r, c, dr, dc) {
@@ -144,9 +154,9 @@
         const ent = chain[i];
         const newR = ent.row + dr, newC = ent.col + dc;
         if (ent instanceof Crate) {
-          crates.delete(`${ent.row},${ent.col}`);
+          crates.delete(K(ent.row, ent.col));
           ent.row = newR; ent.col = newC;
-          crates.set(`${newR},${newC}`, ent);
+          crates.set(K(newR, newC), ent);
         } else {
           ent.row = newR; ent.col = newC;
         }
@@ -210,9 +220,9 @@
           ball = null;
           statusEl.textContent = '⚠ 球被覆盖，已移除球';
         } else if (ent instanceof Crate) {
-          crates.delete(`${row},${col}`);
+          crates.delete(K(row, col));
         }
-        waterTiles.delete(`${row},${col}`);
+        waterTiles.delete(K(row, col));
       }
       if (grid[row][col] === value) return;
       grid[row][col] = value;
@@ -315,7 +325,7 @@
     function exportMap() {
       const tiles = grid.map(row => [...row]);
       for (const crate of crates.values()) {
-        tiles[crate.row][crate.col] = CRATES[crate.crateKey].id;
+        tiles[crate.row][crate.col] = Object.keys(CRATES).indexOf(crate.crateKey) + 2;
       }
       const data = {
         width: GRID_SIZE,
@@ -361,12 +371,9 @@
     // 绳子跟随：主角移动后球尝试跟上，返回false则主角需撤销移动
     function followBall(prevRow, prevCol) {
       if (!ball) return true;
-      const dist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
-      if (dist <= 1) return true;
+      if (dist(hero.row, hero.col, ball.row, ball.col) <= 1) return true;
 
-      // 快照crates：diagOk/推箱可能移动箱子，失败时需整体回滚
-      const savedCrates = new Map();
-      for (const [k, v] of crates) savedCrates.set(k, new Crate(v.row, v.col, v.crateKey));
+      const savedCrates = snapshotCrates();
       const prevBallRow = ball.row, prevBallCol = ball.col;
       const dr = Math.sign(prevRow - ball.row);
       const dc = Math.sign(prevCol - ball.col);
@@ -397,8 +404,7 @@
       let ballMoved = false;
       for (const c of candidates) {
         if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
-        const d = Math.max(Math.abs(hero.row - c.row), Math.abs(hero.col - c.col));
-        if (d > 1) continue;
+        if (dist(hero.row, hero.col, c.row, c.col) > 1) continue;
         const chain = getPushChain(c.row, c.col, c.pushDr, c.pushDc);
         if (!chain || chain.length === 0) continue;
         pushChain(chain, c.pushDr, c.pushDc);
@@ -411,7 +417,7 @@
         for (const c of candidates) {
           if (c.row < 0 || c.row >= GRID_SIZE || c.col < 0 || c.col >= GRID_SIZE) continue;
           if (isSolid(c.row, c.col)) continue;
-          const d = Math.max(Math.abs(hero.row - c.row), Math.abs(hero.col - c.col));
+          if (dist(hero.row, hero.col, c.row, c.col) > 1) continue;
           if (d > 1) continue;
           ball.row = c.row;
           ball.col = c.col;
@@ -420,12 +426,9 @@
         }
       }
 
-      const finalDist = Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col));
-      if (finalDist > 1) {
+      if (dist(hero.row, hero.col, ball.row, ball.col) > 1) {
         ball.row = prevBallRow; ball.col = prevBallCol;
-        // 回滚followBall内所有箱子移动
-        crates.clear();
-        for (const [k, v] of savedCrates) crates.set(k, v);
+        restoreCrates(savedCrates);
         return false;
       }
       return true;
@@ -436,8 +439,7 @@
       if (!ball || !ball.lightOn) return;
       for (const [key, crate] of crates) {
         if (crate.crateKey !== 'snow') continue;
-        const dist = Math.max(Math.abs(ball.row - crate.row), Math.abs(ball.col - crate.col));
-        if (dist <= 1) {
+        if (dist(ball.row, ball.col, crate.row, crate.col) <= 1) {
           crates.delete(key);
           waterTiles.add(key);
         }
@@ -474,21 +476,16 @@
           if (chain === null) return; // 墙或出界阻塞
 
           // 快照（followBall失败时回滚用）
-          const savedCrates = new Map();
-          for (const [k, v] of crates) savedCrates.set(k, new Crate(v.row, v.col, v.crateKey));
+          const savedCrates = snapshotCrates();
           const savedBallRow = ball ? ball.row : null, savedBallCol = ball ? ball.col : null;
 
-          // 从后往前移动实体链
+          // 链式推动 + 移动主角
           pushChain(chain, dir.dr, dir.dc);
-
-          // 移动主角
           hero.row = nr; hero.col = nc;
 
-          // 绳子跟随（球紧邻则立即返回true，否则尝试跟上）
+          // 绳子跟随
           if (!followBall(prevRow, prevCol)) {
-            // 回滚全部
-            crates.clear();
-            for (const [k, v] of savedCrates) crates.set(k, v);
+            restoreCrates(savedCrates);
             if (ball) { ball.row = savedBallRow; ball.col = savedBallCol; }
             hero.row = prevRow; hero.col = prevCol;
             ball.toggle();
@@ -499,7 +496,7 @@
           meltSnow();
           statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +
             (ball ? `  球位置: (${ball.row}, ${ball.col}) [${ball.lightOn ? '💡开' : '🌑关'}]` : '') +
-            (ball ? `  距离: ${Math.max(Math.abs(hero.row - ball.row), Math.abs(hero.col - ball.col))}` : '');
+            (ball ? `  距离: ${dist(hero.row, hero.col, ball.row, ball.col)}` : '');
           render();
         }
       }
@@ -556,12 +553,12 @@
     }
 
     // === 球 ===
-    function drawBall(row, col) {
-      const x = col * TILE_SIZE;
-      const y = row * TILE_SIZE;
+    function drawBall(ball) {
+      const x = ball.col * TILE_SIZE;
+      const y = ball.row * TILE_SIZE;
       const s = TILE_SIZE / 8;
 
-      if (ball && ball.lightOn) {
+      if (ball.lightOn) {
         // === 开灯形态：亮黄色发光球 ===
         // 外发光
         const cx = x + TILE_SIZE / 2;
@@ -723,7 +720,7 @@
       ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
     }
 
-    function placeCrate(row, col, crateKey) {
+    function placeCrate(row, col) {
       if (isSolid(row, col)) {
         statusEl.textContent = '⚠ 此处已被占用！';
         return;
@@ -736,9 +733,8 @@
         statusEl.textContent = '⚠ 球在此处！';
         return;
       }
-      const key = crateKey || currentCrateKey;
-      const type = CRATES[key];
-      crates.set(`${row},${col}`, new Crate(row, col, key));
+      const type = CRATES[currentCrateKey];
+      crates.set(K(row, col), new Crate(row, col, currentCrateKey));
       statusEl.textContent = `${type.emoji} ${type.name}已放置`;
       render();
     }
@@ -846,7 +842,7 @@
         for (let c = 0; c < GRID_SIZE; c++) {
           if (grid[r][c] === T_WALL) {
             drawWallTile(r, c);
-          } else if (waterTiles.has(`${r},${c}`)) {
+          } else if (waterTiles.has(K(r, c))) {
             drawWaterTile(r, c);
           } else {
             drawEmptyTile(r, c);
@@ -882,9 +878,7 @@
       drawRope();
 
       // 5. 球（在角色下面，先画）
-      if (ball) {
-        drawBall(ball.row, ball.col);
-      }
+      if (ball) drawBall(ball);
 
       // 6. 角色
       if (hero) {
