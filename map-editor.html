@@ -622,6 +622,40 @@
         return true;
       }
 
+      // 同格双箱：跨不过上层但能站到下层上方 → 只推上层箱子，人站下层上方
+      const bottomCrate = crates.get(K(nr, nc));
+      const topCrate = crates.get(K(nr, nc) + ':1');
+      if (bottomCrate && topCrate && targetEnt === topCrate &&
+          hero.height >= bottomCrate.height + bottomCrate.selfHeight) {
+        const topDestR = nr + dr, topDestC = nc + dc;
+        const topChain = getPushChain(topDestR, topDestC, dr, dc, topCrate.height);
+        if (topChain !== null) {
+          const savedCrates = snapshotCrates();
+          const savedHero = { row: hero.row, col: hero.col };
+          const savedBall = ball ? { row: ball.row, col: ball.col } : null;
+          const prevRow = hero.row, prevCol = hero.col;
+          // 推链 + 移动上层箱子 + 人站到下层上方
+          if (topChain.length > 0) pushChain(topChain, dr, dc);
+          crates.delete(K(nr, nc) + ':1');
+          topCrate.row = topDestR; topCrate.col = topDestC;
+          const destKey = K(topDestR, topDestC);
+          if (crates.has(destKey)) {
+            crates.set(destKey + ':1', topCrate);
+          } else {
+            crates.set(destKey, topCrate);
+          }
+          hero.row = nr; hero.col = nc;
+          if (!followBall(prevRow, prevCol)) {
+            restoreCrates(savedCrates);
+            if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
+            hero.row = savedHero.row; hero.col = savedHero.col;
+            ball.toggle();
+            return false;
+          }
+          return true;
+        }
+      }
+
       // 链式推动扫描
       const chain = getPushChain(nr, nc, dr, dc, hero.height);
       if (chain === null) return false;
