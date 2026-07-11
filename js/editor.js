@@ -414,7 +414,7 @@ const KEY_DIR = {
   'ArrowLeft':{dr:0,dc:-1},'a':{dr:0,dc:-1},'A':{dr:0,dc:-1},
   'ArrowRight':{dr:0,dc:1},'d':{dr:0,dc:1},'D':{dr:0,dc:1},
 };
-const KEY_MODE = { '1':'wall','2':'erase','3':'place_hero','4':'play','5':'place_ball','6':'place_crate','7':'diag','8':'web','9':'plate','0':'liftwall','-':'wire' };
+const KEY_MODE = { '1':'wall','2':'diag','3':'erase','4':'web','5':'plate','6':'liftwall','7':'depression','8':'place_hero','9':'place_ball','0':'place_crate','-':'wire' };
 
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
