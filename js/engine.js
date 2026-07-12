@@ -62,6 +62,12 @@ let ball = null;            // Ball | null
 const crates = new Map();   // "row,col" -> Crate
 const wireLinks = [];       // [{plate: "r,c", wall: "r,c"}, ...]
 
+// === 模式元数据（共享常量，避免多处散落的 || 链） ===
+const HOVER_MODES    = new Set(['place_hero','place_ball','place_crate','web','plate','liftwall','wire']);
+const HIGHLIGHT_MODES = new Set(['place_hero','place_ball','place_crate','web','plate','liftwall']); // hover 着色高亮（不含 wire）
+const BLOCKED_AS_WALL_MODES = new Set(['web','plate','liftwall']); // 这些模式在墙体格子 blocked
+const DRAG_MODES     = new Set(['wall','diag','erase','depression']); // 支持拖拽连续放置的模式
+
 // === 状态初始化 ===
 function initGrid() {
   grid = [];
@@ -78,8 +84,17 @@ initGrid();
 const K = (r, c) => `${r},${c}`;
 const dist = (r1, c1, r2, c2) => Math.max(Math.abs(r1 - r2), Math.abs(c1 - c2));
 
-function crateAt(r, c)     { return crates.get(K(r, c) + ':1') || crates.get(K(r, c)) || null; } // 优先返回上层箱子
-function cratesAt(r, c)    { const a = []; const b = crates.get(K(r, c)); if (b) a.push(b); const t = crates.get(K(r, c) + ':1'); if (t) a.push(t); return a; }
+function crateAt(r, c) {
+  const key = K(r, c);
+  return crates.get(key + ':1') || crates.get(key) || null;
+}
+function cratesAt(r, c) {
+  const a = [];
+  const key = K(r, c);
+  const b = crates.get(key); if (b) a.push(b);
+  const t = crates.get(key + ':1'); if (t) a.push(t);
+  return a;
+}
 function entityCount(r, c) { let n = 0; if (hero && hero.row === r && hero.col === c) n++; if (ball && ball.row === r && ball.col === c) n++; const cs = cratesAt(r, c); n += cs.length; return n; }
 function entityAt(r, c) {
   if (hero && hero.row === r && hero.col === c) return hero;
@@ -90,7 +105,7 @@ function entityAt(r, c) {
 function entityForPush(r, c) {
   if (ball && ball.row === r && ball.col === c) return ball;
   const key = K(r, c);
-  return crates.get(key) || crates.get(key + ':1');
+  return crates.get(key) || crates.get(key + ':1') || null;
 }
 function isSolid(r, c)     { return grid[r][c].base === T_WALL || crateAt(r, c) !== null; }
 
@@ -233,16 +248,18 @@ function updateLiftWalls() {
     }
   }
   for (const link of wireLinks) {
-    if (wallPlates.has(link.wall)) {
-      wallPlates.get(link.wall).add(link.plate);
-    }
+    const plateSet = wallPlates.get(link.wall);
+    if (plateSet) plateSet.add(link.plate);
   }
   for (const [wkey, plates] of wallPlates) {
     const [wr, wc] = wkey.split(',').map(Number);
-    const allPressed = plates.size > 0 && [...plates].every(pk => {
-      const [pr, pc] = pk.split(',').map(Number);
-      return entityAt(pr, pc) !== null;
-    });
+    let allPressed = plates.size > 0;
+    if (allPressed) {
+      for (const pk of plates) {
+        const [pr, pc] = pk.split(',').map(Number);
+        if (entityAt(pr, pc) === null) { allPressed = false; break; }
+      }
+    }
     const tile = grid[wr][wc];
     const canRaise = allPressed && entityCount(wr, wc) < 2;
     if (tile.liftWall === 'up') {

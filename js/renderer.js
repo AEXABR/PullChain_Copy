@@ -37,30 +37,11 @@ function drawWallTile(row, col) {
 }
 
 function drawDiagWallTile(row, col, gaps) {
+  // 先画普通墙底，再覆盖缺口三角
+  drawWallTile(row, col);
+
   const x = col * TILE_SIZE;
   const y = row * TILE_SIZE;
-  ctx.fillStyle = '#555566';
-  ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-  ctx.strokeStyle = '#777788';
-  ctx.lineWidth = 1;
-  const third = TILE_SIZE / 3;
-  ctx.beginPath();
-  ctx.moveTo(x, y + third);
-  ctx.lineTo(x + TILE_SIZE, y + third);
-  ctx.moveTo(x, y + third * 2);
-  ctx.lineTo(x + TILE_SIZE, y + third * 2);
-  ctx.moveTo(x + TILE_SIZE / 2, y);
-  ctx.lineTo(x + TILE_SIZE / 2, y + third);
-  ctx.moveTo(x, y + third);
-  ctx.lineTo(x, y + third * 2);
-  ctx.moveTo(x + TILE_SIZE / 2, y + third * 2);
-  ctx.lineTo(x + TILE_SIZE / 2, y + TILE_SIZE);
-  ctx.stroke();
-  ctx.strokeStyle = '#444455';
-  ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
-
-  // 缺口指示三角（遍历所有缺口角）
-  ctx.fillStyle = '#3a3a4e';
   const gap = TILE_SIZE / 4;
   const cornerPts = {
     TL: [[x, y], [x + gap, y], [x, y + gap]],
@@ -68,6 +49,7 @@ function drawDiagWallTile(row, col, gaps) {
     BL: [[x, y + TILE_SIZE], [x + gap, y + TILE_SIZE], [x, y + TILE_SIZE - gap]],
     BR: [[x + TILE_SIZE, y + TILE_SIZE], [x + TILE_SIZE - gap, y + TILE_SIZE], [x + TILE_SIZE, y + TILE_SIZE - gap]],
   };
+  ctx.fillStyle = '#3a3a4e';
   for (const corner of gaps) {
     const pts = cornerPts[corner];
     if (!pts) continue;
@@ -77,13 +59,6 @@ function drawDiagWallTile(row, col, gaps) {
     ctx.lineTo(pts[2][0], pts[2][1]);
     ctx.fill();
   }
-
-  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
-  ctx.beginPath();
-  ctx.moveTo(x, y + TILE_SIZE);
-  ctx.lineTo(x, y);
-  ctx.lineTo(x + TILE_SIZE, y);
-  ctx.stroke();
 }
 
 function drawGridLines() {
@@ -609,28 +584,15 @@ function drawRope() {
 function render() {
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  // 1. 空地底色
-  for (let r = 0; r < GRID_SIZE; r++) {
-    for (let c = 0; c < GRID_SIZE; c++) {
-      if (grid[r][c].base !== T_WALL) {
-        drawEmptyTile(r, c);
-      }
-    }
-  }
-  // 2. 水
+  // 1. 地面层：空地底色 + 水渍 + 洼地（合为一次遍历）
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
       const tile = grid[r][c];
-      if (tile.base !== T_WALL && tile.hasWater) {
+      if (tile.base === T_WALL) continue;
+      drawEmptyTile(r, c);
+      if (tile.hasWater) {
         drawWaterTile(r, c);
-      }
-    }
-  }
-  // 3.5. 洼地
-  for (let r = 0; r < GRID_SIZE; r++) {
-    for (let c = 0; c < GRID_SIZE; c++) {
-      const tile = grid[r][c];
-      if (tile.base !== T_WALL && tile.hasDepression && !tile.hasWater) {
+      } else if (tile.hasDepression) {
         drawDepressionTile(r, c);
       }
     }
@@ -682,16 +644,13 @@ function render() {
   drawGridLines();
 
   // 8. 悬停高亮
-  if ((editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall') && editor.hoverCell) {
+  if (HIGHLIGHT_MODES.has(editor.mode) && editor.hoverCell) {
     const { row, col } = editor.hoverCell;
     const x = col * TILE_SIZE;
     const y = row * TILE_SIZE;
     const tile = grid[row][col];
-    const blocked = (editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall')
+    const blocked = BLOCKED_AS_WALL_MODES.has(editor.mode)
       ? tile.base === T_WALL
-      : editor.mode === 'wire'
-      ? !editor.wireStart ? !tile.isPlate
-        : tile.liftWall === null
       : tile.base === T_WALL && tile.liftWall === null;
     if (blocked) {
       ctx.fillStyle = 'rgba(255, 60, 60, 0.4)';

@@ -146,7 +146,14 @@ function placeLiftWall(row, col) {
 
 function placeDepression(row, col) {
   const tile = grid[row][col];
-  if (tile.base === T_WALL || tile.hasDepression) return;
+  if (tile.base === T_WALL) {
+    statusEl.textContent = '⚠ 不能把洼地放在墙体上！';
+    return;
+  }
+  if (tile.hasDepression) {
+    statusEl.textContent = '⚠ 此处已有洼地！';
+    return;
+  }
   tile.hasDepression = true;
   tile.hasWater = false;
   render();
@@ -294,6 +301,22 @@ function getCellFromEvent(e) {
   return { row, col };
 }
 
+// 模式→放置函数映射（模块级，handleCanvasDown 和 handleCanvasMove 共享）
+function makePlaceActions(cell) {
+  return {
+    wall:        () => setTile(cell.row, cell.col, T_WALL),
+    diag:        () => placeDiagWall(cell.row, cell.col),
+    erase:       () => eraseTop(cell.row, cell.col),
+    place_hero:  () => placeHero(cell.row, cell.col),
+    place_ball:  () => placeBall(cell.row, cell.col),
+    place_crate: () => placeCrate(cell.row, cell.col),
+    web:         () => placeWeb(cell.row, cell.col),
+    plate:       () => placePlate(cell.row, cell.col),
+    liftwall:    () => placeLiftWall(cell.row, cell.col),
+    depression:  () => placeDepression(cell.row, cell.col),
+  };
+}
+
 function handleCanvasDown(e) {
   if (editor.mode === 'play') return;
   editor.isDrawing = true;
@@ -321,40 +344,33 @@ function handleCanvasDown(e) {
     return;
   }
 
-  const placeActions = {
-    wall:        () => setTile(cell.row, cell.col, T_WALL),
-    diag:        () => placeDiagWall(cell.row, cell.col),
-    erase:       () => eraseTop(cell.row, cell.col),
-    place_hero:  () => placeHero(cell.row, cell.col),
-    place_ball:  () => placeBall(cell.row, cell.col),
-    place_crate: () => placeCrate(cell.row, cell.col),
-    web:         () => placeWeb(cell.row, cell.col),
-    plate:       () => placePlate(cell.row, cell.col),
-    liftwall:    () => placeLiftWall(cell.row, cell.col),
-    depression:  () => placeDepression(cell.row, cell.col),
-  };
-  if (placeActions[editor.mode]) placeActions[editor.mode]();
+  const actions = makePlaceActions(cell);
+  if (actions[editor.mode]) actions[editor.mode]();
 }
 
 function handleCanvasMove(e) {
   const cell = getCellFromEvent(e);
+  const prev = editor.hoverCell;
+  // 仅在 hover 格子变化时才重新渲染
+  const changed = (prev && !cell) || (!prev && cell) || (prev && cell && (prev.row !== cell.row || prev.col !== cell.col));
   editor.hoverCell = cell;
 
-  if (editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall' || editor.mode === 'wire') {
+  if (changed && HOVER_MODES.has(editor.mode)) {
     render();
     return;
   }
 
-  if (!editor.isDrawing) return;
-  if (!cell) return;
+  if (!editor.isDrawing || !cell) return;
 
-  const dragActions = {
-    wall:  () => setTile(cell.row, cell.col, T_WALL),
-    diag:  () => placeDiagWall(cell.row, cell.col),
-    erase: () => { const k = K(cell.row, cell.col); if (k !== lastErasedKey) { lastErasedKey = k; eraseTop(cell.row, cell.col); } },
-    depression: () => placeDepression(cell.row, cell.col),
-  };
-  if (dragActions[editor.mode]) dragActions[editor.mode]();
+  // 拖拽连续放置：复用 placeActions 函数，只对支持拖拽的模式生效
+  if (DRAG_MODES.has(editor.mode)) {
+    if (editor.mode === 'erase') {
+      const k = K(cell.row, cell.col);
+      if (k !== lastErasedKey) { lastErasedKey = k; eraseTop(cell.row, cell.col); }
+    } else {
+      makePlaceActions(cell)[editor.mode]();
+    }
+  }
 }
 
 function handleCanvasUp() {
@@ -372,36 +388,44 @@ canvas.addEventListener('mouseleave', () => {
 });
 
 // === 模式切换 ===
+// 模块级常量（避免每次 setMode 重建）
+const modeLabels = {
+  'wall':        '模式: 画墙 — 点击/拖拽画布放置墙体',
+  'diag':        '', // 动态生成
+  'erase':       '模式: 擦除 — 点击/拖拽画布清除墙体或箱子',
+  'place_hero':  '模式: 放置角色 — 点击空地放置角色',
+  'place_ball':  '模式: 放置球 — 点击空地放置球（不能和角色/箱子同格）',
+  'place_crate': '', // 动态生成
+  'web':         '模式: 蜘蛛网 — 点击/拖拽在空地上放置蜘蛛网',
+  'plate':       '模式: 踏板 — 点击空地放置踏板',
+  'liftwall':    '', // 动态生成
+  'depression':  '模式: 洼地 — 点击/拖拽在空地上放置洼地（高度-1）',
+  'wire':        '模式: 引线 — 点击踏板然后点击升降墙连线',
+  'play':        '模式: 操控 — 方向键/WASD 移动角色'
+};
+const activeBtns = {
+  'wall': btnWall, 'diag': btnDiag, 'erase': btnErase,
+  'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'web': btnWeb, 'plate': btnPlate, 'liftwall': btnLiftwall, 'depression': btnDepression, 'wire': btnWire, 'play': btnPlay
+};
+
 function setMode(newMode) {
   editor.isDrawing = false;
   editor.mode = newMode;
   allBtns.forEach(b => b.classList.remove('active'));
-
-  const modeLabels = {
-    'wall':        '模式: 画墙 — 点击/拖拽画布放置墙体',
-    'diag':        `模式: 画斜角墙(${DIAG_SYMBOLS[editor.currentDiagCorner]}缺口) — 点击/拖拽画布放置`,
-    'erase':       '模式: 擦除 — 点击/拖拽画布清除墙体或箱子',
-    'place_hero':  '模式: 放置角色 — 点击空地放置角色',
-    'place_ball':  '模式: 放置球 — 点击空地放置球（不能和角色/箱子同格）',
-    'place_crate': `模式: 放置${CRATES[editor.currentCrateKey].name} — 点击空地放置`,
-    'web':         '模式: 蜘蛛网 — 点击/拖拽在空地上放置蜘蛛网',
-    'plate':       '模式: 踏板 — 点击空地放置踏板',
-    'liftwall':    `模式: 升降墙(${editor.currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`,
-    'depression':  '模式: 洼地 — 点击/拖拽在空地上放置洼地（高度-1）',
-    'wire':        '模式: 引线 — 点击踏板然后点击升降墙连线',
-    'play':        '模式: 操控 — 方向键/WASD 移动角色'
-  };
-  const activeBtns = {
-    'wall': btnWall, 'diag': btnDiag, 'erase': btnErase,
-    'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'web': btnWeb, 'plate': btnPlate, 'liftwall': btnLiftwall, 'depression': btnDepression, 'wire': btnWire, 'play': btnPlay
-  };
 
   activeBtns[newMode].classList.add('active');
   if (newMode === 'place_crate') updateCrateBtn();
   if (newMode === 'diag') updateDiagBtn();
   if (newMode === 'wire') editor.wireStart = null;
   if (newMode === 'liftwall') updateLiftBtn();
-  statusEl.textContent = modeLabels[newMode];
+
+  // 动态标签（依赖当前选择状态）
+  const dynLabels = {
+    'diag':        `模式: 画斜角墙(${DIAG_SYMBOLS[editor.currentDiagCorner]}缺口) — 点击/拖拽画布放置`,
+    'place_crate': `模式: 放置${CRATES[editor.currentCrateKey].name} — 点击空地放置`,
+    'liftwall':    `模式: 升降墙(${editor.currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`,
+  };
+  statusEl.textContent = dynLabels[newMode] || modeLabels[newMode];
   render();
 }
 
