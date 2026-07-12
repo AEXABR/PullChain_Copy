@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>像素地图编辑器</title>
+<link rel="stylesheet" href="map-editor.css">
+</head>
+<body>
+  <h1>Map Editor</h1>
+  <div id="toolbar">
+    <button id="btn-wall" class="active" data-mode="wall">🖼 画墙 [1]</button>
+    <button id="btn-diag" data-mode="diag">◤ 斜角墙 [2]</button>
+    <button id="btn-erase" data-mode="erase">🗑 擦除 [3]</button>
+    <button id="btn-web" data-mode="web">🕸 蜘蛛网 [4]</button>
+    <button id="btn-plate" data-mode="plate">▫ 踏板 [5]</button>
+    <button id="btn-liftwall" data-mode="liftwall">⇅ 升降墙 [6]</button>
+    <button id="btn-depression" data-mode="depression">🕳 洼地 [7]</button>
+    <button id="btn-hero" data-mode="place_hero">🧍 放角色 [8]</button>
+    <button id="btn-ball" data-mode="place_ball">🟡 放球 [9]</button>
+    <button id="btn-crate" data-mode="place_crate">📦 放箱子 [0]</button>
+    <button id="btn-wire" data-mode="wire">🔗 引线 [-]</button>
+    <button id="btn-play" data-mode="play">▶ 操控</button>
+    <button id="btn-clear">🗺 清空</button>
+    <button id="btn-export">💾 导出</button>
+  </div>
+  <div id="status">模式: 画墙 — 点击/拖拽画布放置墙体</div>
+  <canvas id="map" width="512" height="512"></canvas>
+
+  <!-- 共享 DOM 引用 -->
+  <script>
+    const canvas = document.getElementById('map');
+    const ctx = canvas.getContext('2d');
+    const statusEl = document.getElementById('status');
+  </script>
+  <!-- 游戏引擎（纯逻辑，无 DOM 依赖） -->
+  <script src="js/engine.js"></script>
+  <!-- 渲染器（依赖 engine.js + ctx） -->
+  <script src="js/renderer.js"></script>
+  <!-- 编辑器 UI（依赖 engine.js + renderer.js） -->
+  <script src="js/editor.js"></script>
+</body>
+</html>
