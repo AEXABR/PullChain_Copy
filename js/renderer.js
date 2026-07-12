@@ -471,26 +471,47 @@ function drawWires() {
   }
 }
 
-// === 渲染：水 ===
+// === 渲染：水（圆形水渍） ===
 function drawWaterTile(row, col) {
   const x = col * TILE_SIZE;
   const y = row * TILE_SIZE;
   const s = TILE_SIZE / 8;
-  const x0 = x + s, y0 = y + s, w = s * 6;
+  const cx = x + TILE_SIZE / 2;
+  const cy = y + TILE_SIZE / 2;
+  const r = s * 3;  // 半径 3s，与球同宽
 
-  ctx.fillStyle = '#3377aa';
-  ctx.fillRect(x0, y0, w, w);
-  ctx.fillStyle = '#4499cc';
-  ctx.fillRect(x0, y0 + s * 0, w, s);
-  ctx.fillRect(x0, y0 + s * 2, w, s);
-  ctx.fillRect(x0, y0 + s * 4, w, s);
-  ctx.fillStyle = '#66bbee';
-  ctx.fillRect(x0 + 2, y0 + s * 1, w - 4, s);
-  ctx.fillRect(x0 + 2, y0 + s * 3, w - 4, s);
-  ctx.fillRect(x0 + 2, y0 + s * 5, w - 4, s);
+  // 水渍底色（径向渐变，中心深边缘浅）
+  const baseGrad = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r);
+  baseGrad.addColorStop(0, '#225588');
+  baseGrad.addColorStop(0.6, '#3377aa');
+  baseGrad.addColorStop(1, '#4499bb');
+  ctx.fillStyle = baseGrad;
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 波纹（同心圆弧，从内到外）
+  ctx.strokeStyle = 'rgba(100, 180, 220, 0.35)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i <= 3; i++) {
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * (0.25 + i * 0.2), 0, Math.PI * 2);
+    ctx.stroke();
+  }
+
+  // 高光弧线
+  ctx.strokeStyle = 'rgba(180, 220, 255, 0.3)';
+  ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.arc(cx - r * 0.1, cy - r * 0.15, r * 0.5, -0.7, 1.2);
+  ctx.stroke();
+
+  // 描边
   ctx.strokeStyle = '#2266aa';
   ctx.lineWidth = 1;
-  ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, w - 1);
+  ctx.beginPath();
+  ctx.arc(cx, cy, r, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 // === 渲染：蜘蛛网 ===
