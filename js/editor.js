@@ -15,6 +15,9 @@ const btnExport = document.getElementById('btn-export');
 const btnClear = document.getElementById('btn-clear');
 const allBtns = [btnWall, btnDiag, btnErase, btnHero, btnBall, btnCrate, btnWeb, btnPlate, btnLiftwall, btnDepression, btnWire, btnPlay];
 
+// 拖拽擦除时记录上一个擦除的格子，避免重复擦除
+let lastErasedKey = null;
+
 // === 地块编辑 ===
 function setTile(row, col, value) {
   if (value === T_WALL || value === T_EMPTY) {
@@ -135,7 +138,104 @@ function placeDepression(row, col) {
   grid[row][col].hasDepression = true;
   grid[row][col].hasWater = false;
   render();
-  statusEl.textContent = '🕳 洼地已放置（高度-1）';
+  statusEl.textContent = '\u{1F573}️ 洼地已放置（高度-1）';
+}
+
+// 从顶层逐层擦除：每次只移除格子上最上层的一个元素
+function eraseTop(row, col) {
+  const key = K(row, col);
+  const tile = grid[row][col];
+
+  // 1. 角色（最上层）
+  if (hero && hero.row === row && hero.col === col) {
+    hero = null;
+    statusEl.textContent = '\u{1F5D1} 角色已擦除';
+    render();
+    return;
+  }
+  // 2. 球
+  if (ball && ball.row === row && ball.col === col) {
+    ball = null;
+    statusEl.textContent = '\u{1F5D1} 球已擦除';
+    render();
+    return;
+  }
+  // 3. 上层箱子
+  const topCrate = crates.get(key + ':1');
+  if (topCrate) {
+    crates.delete(key + ':1');
+    statusEl.textContent = '\u{1F5D1} 上层箱子已擦除';
+    render();
+    return;
+  }
+  // 4. 底层箱子
+  const bottomCrate = crates.get(key);
+  if (bottomCrate) {
+    crates.delete(key);
+    statusEl.textContent = '\u{1F5D1} 箱子已擦除';
+    render();
+    return;
+  }
+  // 5. 蜘蛛网
+  if (tile.hasWeb) {
+    tile.hasWeb = false;
+    statusEl.textContent = '\u{1F5D1} 蜘蛛网已擦除';
+    render();
+    return;
+  }
+  // 6. 踏板
+  if (tile.isPlate) {
+    tile.isPlate = false;
+    for (let i = wireLinks.length - 1; i >= 0; i--) {
+      if (wireLinks[i].plate === key) wireLinks.splice(i, 1);
+    }
+    if (editor.wireStart === key) editor.wireStart = null;
+    statusEl.textContent = '\u{1F5D1} 踏板已擦除';
+    render();
+    return;
+  }
+  // 7. 升降墙
+  if (tile.liftWall !== null) {
+    tile.liftWall = null;
+    tile.base = T_EMPTY;
+    for (let i = wireLinks.length - 1; i >= 0; i--) {
+      if (wireLinks[i].wall === key) wireLinks.splice(i, 1);
+    }
+    if (editor.wireStart === key) editor.wireStart = null;
+    statusEl.textContent = '\u{1F5D1} 升降墙已擦除';
+    render();
+    return;
+  }
+  // 8. 斜角墙 → 降级为普通墙
+  if (tile.base === T_WALL && tile.diagCorner) {
+    tile.diagCorner = null;
+    statusEl.textContent = '\u{1F5D1} 斜角缺口已擦除（保留墙体）';
+    render();
+    return;
+  }
+  // 9. 普通墙 → 空地
+  if (tile.base === T_WALL) {
+    tile.base = T_EMPTY;
+    statusEl.textContent = '\u{1F5D1} 墙体已擦除';
+    render();
+    return;
+  }
+  // 10. 洼地
+  if (tile.hasDepression) {
+    tile.hasDepression = false;
+    statusEl.textContent = '\u{1F5D1} 洼地已擦除';
+    render();
+    return;
+  }
+  // 11. 水渍
+  if (tile.hasWater) {
+    tile.hasWater = false;
+    statusEl.textContent = '\u{1F5D1} 水渍已擦除';
+    render();
+    return;
+  }
+  // 空无一物
+  statusEl.textContent = '该格已空，无可擦除';
 }
 
 function placeHero(row, col) {
@@ -212,7 +312,7 @@ function handleCanvasDown(e) {
   const placeActions = {
     wall:        () => setTile(cell.row, cell.col, T_WALL),
     diag:        () => placeDiagWall(cell.row, cell.col),
-    erase:       () => setTile(cell.row, cell.col, T_EMPTY),
+    erase:       () => eraseTop(cell.row, cell.col),
     place_hero:  () => placeHero(cell.row, cell.col),
     place_ball:  () => placeBall(cell.row, cell.col),
     place_crate: () => placeCrate(cell.row, cell.col),
@@ -239,7 +339,7 @@ function handleCanvasMove(e) {
   const dragActions = {
     wall:  () => setTile(cell.row, cell.col, T_WALL),
     diag:  () => placeDiagWall(cell.row, cell.col),
-    erase: () => setTile(cell.row, cell.col, T_EMPTY),
+    erase: () => { const k = K(cell.row, cell.col); if (k !== lastErasedKey) { lastErasedKey = k; eraseTop(cell.row, cell.col); } },
     web:        () => placeWeb(cell.row, cell.col),
     plate:      () => placePlate(cell.row, cell.col),
     liftwall:   () => placeLiftWall(cell.row, cell.col),
@@ -250,6 +350,7 @@ function handleCanvasMove(e) {
 
 function handleCanvasUp() {
   editor.isDrawing = false;
+  lastErasedKey = null;
 }
 
 canvas.addEventListener('mousedown', handleCanvasDown);

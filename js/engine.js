@@ -80,6 +80,7 @@ const dist = (r1, c1, r2, c2) => Math.max(Math.abs(r1 - r2), Math.abs(c1 - c2));
 
 function crateAt(r, c)     { return crates.get(K(r, c) + ':1') || crates.get(K(r, c)) || null; } // 优先返回上层箱子
 function cratesAt(r, c)    { const a = []; const b = crates.get(K(r, c)); if (b) a.push(b); const t = crates.get(K(r, c) + ':1'); if (t) a.push(t); return a; }
+function entityCount(r, c) { let n = 0; if (hero && hero.row === r && hero.col === c) n++; if (ball && ball.row === r && ball.col === c) n++; const cs = cratesAt(r, c); n += cs.length; return n; }
 function entityAt(r, c) {
   if (hero && hero.row === r && hero.col === c) return hero;
   if (ball && ball.row === r && ball.col === c) return ball;
@@ -242,10 +243,11 @@ function updateLiftWalls() {
       return entityAt(pr, pc) !== null;
     });
     const tile = grid[wr][wc];
+    const canRaise = allPressed && entityCount(wr, wc) < 2;
     if (tile.liftWall === 'up') {
-      tile.base = allPressed ? T_WALL : T_EMPTY;
+      tile.base = canRaise ? T_WALL : T_EMPTY;
     } else {
-      tile.base = allPressed ? T_EMPTY : T_WALL;
+      tile.base = canRaise ? T_EMPTY : T_WALL;
     }
   }
 }
