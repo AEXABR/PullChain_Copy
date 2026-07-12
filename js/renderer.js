@@ -682,12 +682,12 @@ function render() {
   drawGridLines();
 
   // 8. 悬停高亮
-  if ((editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall' || editor.mode === 'depression') && editor.hoverCell) {
+  if ((editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall') && editor.hoverCell) {
     const { row, col } = editor.hoverCell;
     const x = col * TILE_SIZE;
     const y = row * TILE_SIZE;
     const tile = grid[row][col];
-    const blocked = (editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall' || editor.mode === 'depression')
+    const blocked = (editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall')
       ? tile.base === T_WALL
       : editor.mode === 'wire'
       ? !editor.wireStart ? !tile.isPlate

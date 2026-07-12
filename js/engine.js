@@ -89,7 +89,8 @@ function entityAt(r, c) {
 // entityForPush: 推链专用，排除主角。箱子取底层（上层跟随移动）
 function entityForPush(r, c) {
   if (ball && ball.row === r && ball.col === c) return ball;
-  return crates.get(K(r, c)) || crates.get(K(r, c) + ':1') || null;
+  const key = K(r, c);
+  return crates.get(key) || crates.get(key + ':1');
 }
 function isSolid(r, c)     { return grid[r][c].base === T_WALL || crateAt(r, c) !== null; }
 
@@ -267,9 +268,7 @@ function meltSnow() {
           crates.set(key, topCrate);
         }
       }
-      const waterKey = key.endsWith(':1') ? key.slice(0, -2) : key;
-      const [wr, wc] = waterKey.split(',').map(Number);
-      grid[wr][wc].hasWater = true;
+      grid[crate.row][crate.col].hasWater = true;
     }
   }
 }
@@ -483,7 +482,7 @@ function tryMoveHero(dr, dc) {
   }
 
   // 站上升降墙
-  if (targetTile.base === T_WALL && targetTile.liftWall !== null && !targetEnt) {
+  if (targetTile.base === T_WALL && !targetEnt) {
     const prevRow = hero.row, prevCol = hero.col;
     hero.row = nr; hero.col = nc;
     if (!followBall(prevRow, prevCol)) {

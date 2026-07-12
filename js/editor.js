@@ -145,12 +145,10 @@ function placeLiftWall(row, col) {
 }
 
 function placeDepression(row, col) {
-  if (grid[row][col].base === T_WALL) {
-    statusEl.textContent = '⚠ 不能把洼地放在墙体上！';
-    return;
-  }
-  grid[row][col].hasDepression = true;
-  grid[row][col].hasWater = false;
+  const tile = grid[row][col];
+  if (tile.base === T_WALL || tile.hasDepression) return;
+  tile.hasDepression = true;
+  tile.hasWater = false;
   render();
   statusEl.textContent = '\u{1F573}️ 洼地已放置（高度-1）';
 }
@@ -342,7 +340,7 @@ function handleCanvasMove(e) {
   const cell = getCellFromEvent(e);
   editor.hoverCell = cell;
 
-  if (editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall' || editor.mode === 'wire' || editor.mode === 'depression') {
+  if (editor.mode === 'place_hero' || editor.mode === 'place_ball' || editor.mode === 'place_crate' || editor.mode === 'web' || editor.mode === 'plate' || editor.mode === 'liftwall' || editor.mode === 'wire') {
     render();
     return;
   }
@@ -354,9 +352,6 @@ function handleCanvasMove(e) {
     wall:  () => setTile(cell.row, cell.col, T_WALL),
     diag:  () => placeDiagWall(cell.row, cell.col),
     erase: () => { const k = K(cell.row, cell.col); if (k !== lastErasedKey) { lastErasedKey = k; eraseTop(cell.row, cell.col); } },
-    web:        () => placeWeb(cell.row, cell.col),
-    plate:      () => placePlate(cell.row, cell.col),
-    liftwall:   () => placeLiftWall(cell.row, cell.col),
     depression: () => placeDepression(cell.row, cell.col),
   };
   if (dragActions[editor.mode]) dragActions[editor.mode]();
