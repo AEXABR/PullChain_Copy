@@ -577,9 +577,19 @@ function render() {
     }
   }
 
-  // 6. 箱子
-  for (const crate of crates.values()) {
-    drawCrateTile(crate);
+  // 6. 实体：统一收集，按高度排序后绘制（高处在上层）
+  const allEntities = [];
+  for (const crate of crates.values()) allEntities.push(crate);
+  if (ball) allEntities.push(ball);
+  if (hero) allEntities.push(hero);
+  allEntities.sort((a, b) => {
+    if (a.height !== b.height) return a.height - b.height;
+    return entityPriority(a) - entityPriority(b);
+  });
+  for (const ent of allEntities) {
+    if (ent instanceof Hero)       drawHero(ent);
+    else if (ent instanceof Ball)  drawBall(ent);
+    else if (ent instanceof Crate) drawCrateTile(ent);
   }
 
   // 7. 网格线
@@ -608,14 +618,5 @@ function render() {
   // 9. 绳子
   drawRope();
 
-  // 10. 球
-  if (ball) drawBall(ball);
-
-  // 11. 角色
-  if (hero) {
-    drawHero(hero);
-  }
-
-  // 12. 引线（最上层）
+  // 10. 引线（最上层）
   drawWires();
-}
