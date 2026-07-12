@@ -255,17 +255,44 @@ function drawSnowTile(row, col, inset = 1) {
   const y = row * TILE_SIZE;
   const s = TILE_SIZE / 8;
   const x0 = x + s * inset, y0 = y + s * inset, w = s * (8 - inset * 2);
+  const cx = x0 + w / 2, cy = y0 + w / 2;
+  const rx = w / 2 - 1;          // 椭圆水平半径
+  const ry = rx * 0.78;          // 椭圆垂直半径（略扁，表现柱体透视）
 
-  ctx.fillStyle = '#d8e8f0';
-  ctx.fillRect(x0, y0, w, w);
-  ctx.fillStyle = '#b8d4e8';
-  ctx.fillRect(x0 + 2, y0 + 2, w - 4, w - 4);
-  ctx.fillStyle = '#ffffff';
-  const cx = x0 + w / 2, cy = y0 + w / 2, r = w / 4;
-  ctx.fillRect(cx - r / 2, cy - r / 2, r, r);
+  // 底部阴影
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.18)';
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + ry * 0.35, rx, ry * 0.55, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 柱体侧面（略深，模拟曲面暗部）
+  const sideGrad = ctx.createLinearGradient(cx - rx, cy - ry, cx + rx, cy + ry);
+  sideGrad.addColorStop(0, '#c8dce8');
+  sideGrad.addColorStop(0.3, '#d8e8f0');
+  sideGrad.addColorStop(0.7, '#b0c8d8');
+  sideGrad.addColorStop(1, '#90b0c0');
+  ctx.fillStyle = sideGrad;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 柱体顶面（更亮，扁平椭圆表现顶面透视）
+  const topRy = ry * 0.55;
+  const topGrad = ctx.createLinearGradient(cx, cy - topRy, cx, cy + topRy);
+  topGrad.addColorStop(0, '#ffffff');
+  topGrad.addColorStop(0.5, '#e8f4fa');
+  topGrad.addColorStop(1, '#c8dce8');
+  ctx.fillStyle = topGrad;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy - ry * 0.2, rx * 0.85, topRy, 0, 0, Math.PI * 2);
+  ctx.fill();
+
+  // 描边
   ctx.strokeStyle = '#8ab8d0';
   ctx.lineWidth = 1;
-  ctx.strokeRect(x0 + 0.5, y0 + 0.5, w - 1, w - 1);
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, rx, ry, 0, 0, Math.PI * 2);
+  ctx.stroke();
 }
 
 function drawMothTile(row, col, inset = 1, hover = 0) {
