@@ -373,9 +373,10 @@ function moveMoths() {
       crate.col = nc;
       crates.set(K(nr, nc), crate);
       // 高度不变（飞蛾特性）
+
+      // 立即更新升降墙：飞蛾可能踩到了踏板，墙状态改变会影响后续视线
+      updateLiftWalls();
     }
-    // 飞蛾停稳后更新升降墙（可能踩到了踏板）
-    updateLiftWalls();
   }
 }
 
