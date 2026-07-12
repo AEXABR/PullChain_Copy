@@ -478,7 +478,7 @@ function drawWaterTile(row, col) {
   const s = TILE_SIZE / 8;
   const cx = x + TILE_SIZE / 2;
   const cy = y + TILE_SIZE / 2;
-  const r = s * 3;  // 半径 3s，与球同宽
+  const r = s * 3.6;  // 半径 3.6s，比球（3s）大一圈
 
   // 水渍底色（径向渐变，中心深边缘浅）
   const baseGrad = ctx.createRadialGradient(cx, cy, r * 0.15, cx, cy, r);
