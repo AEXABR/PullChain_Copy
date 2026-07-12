@@ -3,7 +3,6 @@
   --text: #e0e0e0;
   --accent: #e94560;
   --btn-bg: #0f3460;
-  --btn-active: #e94560;
   --canvas-bg: #2a2a3e;
 }
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -21,7 +20,6 @@ h1 {
   font-size: 24px;
   letter-spacing: 4px;
   margin-bottom: 16px;
-  image-rendering: pixelated;
   text-transform: uppercase;
 }
 #toolbar {
@@ -39,13 +37,12 @@ h1 {
   font-family: 'Courier New', monospace;
   font-size: 14px;
   cursor: pointer;
-  image-rendering: pixelated;
   transition: background 0.1s;
 }
 #toolbar button:hover { border-color: var(--accent); }
 #toolbar button.active {
-  background: var(--btn-active);
-  border-color: var(--btn-active);
+  background: var(--accent);
+  border-color: var(--accent);
 }
 #status {
   font-size: 13px;

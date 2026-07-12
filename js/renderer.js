@@ -584,32 +584,24 @@ function drawRope() {
 function render() {
   ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
 
-  // 1. 地面层：空地底色 + 水渍 + 洼地（合为一次遍历）
+  // 1. 地面层 → 2. 板/墙/网/升降墙（全部合为一趟遍历，每格按 Z 序逐层绘制）
   for (let r = 0; r < GRID_SIZE; r++) {
     for (let c = 0; c < GRID_SIZE; c++) {
       const tile = grid[r][c];
-      if (tile.base === T_WALL) continue;
-      drawEmptyTile(r, c);
-      if (tile.hasWater) {
-        drawWaterTile(r, c);
-      } else if (tile.hasDepression) {
-        drawDepressionTile(r, c);
-      }
-    }
-  }
-  // 4. 踏板
-  for (let r = 0; r < GRID_SIZE; r++) {
-    for (let c = 0; c < GRID_SIZE; c++) {
-      if (grid[r][c].isPlate) {
-        drawPlateTile(r, c);
-      }
-    }
-  }
-  // 5. 墙、蜘蛛网、升降墙
-  for (let r = 0; r < GRID_SIZE; r++) {
-    for (let c = 0; c < GRID_SIZE; c++) {
-      const tile = grid[r][c];
-      if (tile.base === T_WALL) {
+      if (tile.base !== T_WALL) {
+        drawEmptyTile(r, c);
+        if (tile.hasWater) {
+          drawWaterTile(r, c);
+        } else if (tile.hasDepression) {
+          drawDepressionTile(r, c);
+        }
+        if (tile.isPlate) drawPlateTile(r, c);
+        if (tile.liftWall !== null) {
+          drawLiftWallTile(r, c, false);
+        } else if (tile.hasWeb) {
+          drawWebTile(r, c);
+        }
+      } else {
         if (tile.diagCorner && tile.diagCorner.length > 0) {
           drawDiagWallTile(r, c, tile.diagCorner);
         } else if (tile.liftWall !== null) {
@@ -617,15 +609,11 @@ function render() {
         } else {
           drawWallTile(r, c);
         }
-      } else if (tile.liftWall !== null) {
-        drawLiftWallTile(r, c, false);
-      } else if (tile.hasWeb) {
-        drawWebTile(r, c);
       }
     }
   }
 
-  // 6. 实体：统一收集，按高度排序后绘制（高处在上层）
+  // 3. 实体：统一收集，按高度排序后绘制（高处在上层）
   const allEntities = [];
   for (const crate of crates.values()) allEntities.push(crate);
   if (ball) allEntities.push(ball);
@@ -640,10 +628,10 @@ function render() {
     else if (ent instanceof Crate) drawCrateTile(ent);
   }
 
-  // 7. 网格线
+  // 4. 网格线
   drawGridLines();
 
-  // 8. 悬停高亮
+  // 5. 悬停高亮
   if (HIGHLIGHT_MODES.has(editor.mode) && editor.hoverCell) {
     const { row, col } = editor.hoverCell;
     const x = col * TILE_SIZE;
@@ -660,9 +648,9 @@ function render() {
     ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
   }
 
-  // 9. 绳子
+  // 6. 绳子
   drawRope();
 
-  // 10. 引线（最上层）
+  // 7. 引线（最上层）
   drawWires();
 }
