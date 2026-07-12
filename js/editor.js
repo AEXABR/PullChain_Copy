@@ -301,21 +301,19 @@ function getCellFromEvent(e) {
   return { row, col };
 }
 
-// 模式→放置函数映射（模块级，handleCanvasDown 和 handleCanvasMove 共享）
-function makePlaceActions(cell) {
-  return {
-    wall:        () => setTile(cell.row, cell.col, T_WALL),
-    diag:        () => placeDiagWall(cell.row, cell.col),
-    erase:       () => eraseTop(cell.row, cell.col),
-    place_hero:  () => placeHero(cell.row, cell.col),
-    place_ball:  () => placeBall(cell.row, cell.col),
-    place_crate: () => placeCrate(cell.row, cell.col),
-    web:         () => placeWeb(cell.row, cell.col),
-    plate:       () => placePlate(cell.row, cell.col),
-    liftwall:    () => placeLiftWall(cell.row, cell.col),
-    depression:  () => placeDepression(cell.row, cell.col),
-  };
-}
+// 模式→放置函数映射（模块级，零闭包分配）
+const PLACE_ACTIONS = {
+  wall:        (r, c) => setTile(r, c, T_WALL),
+  diag:        (r, c) => placeDiagWall(r, c),
+  erase:       (r, c) => eraseTop(r, c),
+  place_hero:  (r, c) => placeHero(r, c),
+  place_ball:  (r, c) => placeBall(r, c),
+  place_crate: (r, c) => placeCrate(r, c),
+  web:         (r, c) => placeWeb(r, c),
+  plate:       (r, c) => placePlate(r, c),
+  liftwall:    (r, c) => placeLiftWall(r, c),
+  depression:  (r, c) => placeDepression(r, c),
+};
 
 function handleCanvasDown(e) {
   if (editor.mode === 'play') return;
@@ -344,8 +342,7 @@ function handleCanvasDown(e) {
     return;
   }
 
-  const actions = makePlaceActions(cell);
-  if (actions[editor.mode]) actions[editor.mode]();
+  PLACE_ACTIONS[editor.mode]?.(cell.row, cell.col);
 }
 
 function handleCanvasMove(e) {
@@ -368,7 +365,7 @@ function handleCanvasMove(e) {
       const k = K(cell.row, cell.col);
       if (k !== lastErasedKey) { lastErasedKey = k; eraseTop(cell.row, cell.col); }
     } else {
-      makePlaceActions(cell)[editor.mode]();
+      PLACE_ACTIONS[editor.mode](cell.row, cell.col);
     }
   }
 }
