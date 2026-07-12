@@ -11,7 +11,7 @@ const T_WALL  = 1;
 class Tile {
   constructor() {
     this.base = T_EMPTY;        // T_EMPTY | T_WALL
-    this.diagCorner = null;     // 'TL'|'TR'|'BL'|'BR'|null  斜角墙缺口朝向
+    this.diagCorner = null;     // null | ['TL','TR','BL','BR',...]  斜角墙缺口（可多个）
     this.liftWall = null;       // 'up'|'down'|null  升降墙类型
     this.isPlate = false;       // 踏板
     this.hasWater = false;      // 水渍
@@ -397,9 +397,9 @@ function followBall(prevRow, prevCol) {
     const c2chain = getPushChain(c2r, c2c, 0, dc, ball.height);
     const needed = diagCornersFor(dr, dc);
     const c1clear = grid[c1r] && (!isSolid(c1r, c1c) || c1chain !== null
-                                   || (needed && grid[c1r][c1c].diagCorner === needed[0]));
+                                   || (needed && grid[c1r][c1c].diagCorner?.includes(needed[0])));
     const c2clear = grid[c2r] && (!isSolid(c2r, c2c) || c2chain !== null
-                                   || (needed && grid[c2r][c2c].diagCorner === needed[1]));
+                                   || (needed && grid[c2r][c2c].diagCorner?.includes(needed[1])));
     if (c1clear && c2clear) {
       diagOk = true;
       diagCorner = { c1chain, c2chain };

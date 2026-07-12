@@ -56,13 +56,27 @@ function setTile(row, col, value) {
 
 // === 放置函数 ===
 function placeDiagWall(row, col) {
-  if (isSolid(row, col)) {
-    // 允许覆盖已有的斜角墙（更改缺口朝向）或普通墙（升级为斜角墙）
+  const tile = grid[row][col];
+  // 先确保是墙体
+  if (tile.base !== T_WALL) {
+    setTile(row, col, T_WALL);
   }
-  setTile(row, col, T_WALL);
-  grid[row][col].diagCorner = editor.currentDiagCorner;
+  // Toggle 当前选中的缺口角
+  const corners = tile.diagCorner;
+  if (!corners) {
+    tile.diagCorner = [editor.currentDiagCorner];
+  } else {
+    const idx = corners.indexOf(editor.currentDiagCorner);
+    if (idx >= 0) {
+      corners.splice(idx, 1);
+      if (corners.length === 0) tile.diagCorner = null;
+    } else {
+      corners.push(editor.currentDiagCorner);
+    }
+  }
   render();
-  statusEl.textContent = `${DIAG_SYMBOLS[editor.currentDiagCorner]} 斜角墙(${editor.currentDiagCorner}缺口)已放置`;
+  const gaps = tile.diagCorner ? tile.diagCorner.map(c => DIAG_SYMBOLS[c]).join('') : '无';
+  statusEl.textContent = `斜角墙 缺口: ${gaps}`;
 }
 
 function placeCrate(row, col) {
@@ -206,8 +220,8 @@ function eraseTop(row, col) {
     render();
     return;
   }
-  // 8. 斜角墙 → 降级为普通墙
-  if (tile.base === T_WALL && tile.diagCorner) {
+  // 8. 斜角墙缺口 → 降级为普通墙（移除所有缺口）
+  if (tile.base === T_WALL && tile.diagCorner && tile.diagCorner.length > 0) {
     tile.diagCorner = null;
     statusEl.textContent = '\u{1F5D1} 斜角缺口已擦除（保留墙体）';
     render();

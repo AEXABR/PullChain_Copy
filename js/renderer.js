@@ -36,7 +36,7 @@ function drawWallTile(row, col) {
   ctx.stroke();
 }
 
-function drawDiagWallTile(row, col, corner) {
+function drawDiagWallTile(row, col, gaps) {
   const x = col * TILE_SIZE;
   const y = row * TILE_SIZE;
   ctx.fillStyle = '#555566';
@@ -59,21 +59,24 @@ function drawDiagWallTile(row, col, corner) {
   ctx.strokeStyle = '#444455';
   ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
 
-  // 缺口指示三角
+  // 缺口指示三角（遍历所有缺口角）
   ctx.fillStyle = '#3a3a4e';
   const gap = TILE_SIZE / 4;
-  const corners = {
+  const cornerPts = {
     TL: [[x, y], [x + gap, y], [x, y + gap]],
     TR: [[x + TILE_SIZE, y], [x + TILE_SIZE - gap, y], [x + TILE_SIZE, y + gap]],
     BL: [[x, y + TILE_SIZE], [x + gap, y + TILE_SIZE], [x, y + TILE_SIZE - gap]],
     BR: [[x + TILE_SIZE, y + TILE_SIZE], [x + TILE_SIZE - gap, y + TILE_SIZE], [x + TILE_SIZE, y + TILE_SIZE - gap]],
   };
-  const pts = corners[corner];
-  ctx.beginPath();
-  ctx.moveTo(pts[0][0], pts[0][1]);
-  ctx.lineTo(pts[1][0], pts[1][1]);
-  ctx.lineTo(pts[2][0], pts[2][1]);
-  ctx.fill();
+  for (const corner of gaps) {
+    const pts = cornerPts[corner];
+    if (!pts) continue;
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    ctx.lineTo(pts[1][0], pts[1][1]);
+    ctx.lineTo(pts[2][0], pts[2][1]);
+    ctx.fill();
+  }
 
   ctx.strokeStyle = 'rgba(255,255,255,0.08)';
   ctx.beginPath();
@@ -645,7 +648,7 @@ function render() {
     for (let c = 0; c < GRID_SIZE; c++) {
       const tile = grid[r][c];
       if (tile.base === T_WALL) {
-        if (tile.diagCorner) {
+        if (tile.diagCorner && tile.diagCorner.length > 0) {
           drawDiagWallTile(r, c, tile.diagCorner);
         } else if (tile.liftWall !== null) {
           drawLiftWallTile(r, c, true);
