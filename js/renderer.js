@@ -122,46 +122,81 @@ function drawHero(ent) {
   ctx.fillRect(x + s * 4, y + s * 6, s * 2, s * 2);
 }
 
-// === 渲染：球 ===
+// === 渲染：球（圆形，与箱子方形形成四角不重叠的视觉区分） ===
 function drawBall(ball) {
   const x = ball.col * TILE_SIZE;
   const y = ball.row * TILE_SIZE;
   const s = TILE_SIZE / 8;
+  const cx = x + TILE_SIZE / 2;
+  const cy = y + TILE_SIZE / 2;
+  const r = s * 3;  // 圆半径 3s，直径 6s（与箱子 6s×6s 同宽，四角留空）
 
   if (ball.lightOn) {
-    const cx = x + TILE_SIZE / 2;
-    const cy = y + TILE_SIZE / 2;
-    const grad = ctx.createRadialGradient(cx, cy, s * 1, cx, cy, s * 3.5);
+    // 光晕（径向渐变，圆外透明）
+    const grad = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r * 1.3);
     grad.addColorStop(0, 'rgba(255, 255, 100, 0.9)');
     grad.addColorStop(0.5, 'rgba(255, 200, 30, 0.5)');
     grad.addColorStop(1, 'rgba(255, 150, 0, 0)');
     ctx.fillStyle = grad;
-    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 1.3, 0, Math.PI * 2);
+    ctx.fill();
 
-    ctx.fillStyle = '#ffee44';
-    ctx.fillRect(x + s * 1, y + s * 1, s * 6, s * 6);
-    ctx.fillStyle = '#ffffaa';
-    ctx.fillRect(x + s * 2, y + s * 2, s * 3, s * 2);
+    // 球体
+    const bodyGrad = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.3, r * 0.1, cx, cy, r);
+    bodyGrad.addColorStop(0, '#ffffaa');
+    bodyGrad.addColorStop(0.4, '#ffee44');
+    bodyGrad.addColorStop(1, '#ddaa00');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 高光
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.3, cy - r * 0.35, r * 0.35, r * 0.22, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 描边
     ctx.strokeStyle = '#ccaa00';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x + s * 1 + 0.5, y + s * 1 + 0.5, s * 6 - 1, s * 6 - 1);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
   } else {
-    const cx = x + TILE_SIZE / 2;
-    const cy = y + TILE_SIZE / 2;
-    const grad = ctx.createRadialGradient(cx, cy, s * 1, cx, cy, s * 3.5);
+    // 暗光晕
+    const grad = ctx.createRadialGradient(cx, cy, r * 0.4, cx, cy, r * 1.3);
     grad.addColorStop(0, 'rgba(100, 100, 100, 0.4)');
     grad.addColorStop(0.5, 'rgba(80, 80, 80, 0.2)');
     grad.addColorStop(1, 'rgba(60, 60, 60, 0)');
     ctx.fillStyle = grad;
-    ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+    ctx.beginPath();
+    ctx.arc(cx, cy, r * 1.3, 0, Math.PI * 2);
+    ctx.fill();
 
-    ctx.fillStyle = '#888888';
-    ctx.fillRect(x + s * 1, y + s * 1, s * 6, s * 6);
-    ctx.fillStyle = '#aaaaaa';
-    ctx.fillRect(x + s * 2, y + s * 2, s * 3, s * 2);
+    // 球体
+    const bodyGrad = ctx.createRadialGradient(cx - r * 0.25, cy - r * 0.3, r * 0.1, cx, cy, r);
+    bodyGrad.addColorStop(0, '#aaaaaa');
+    bodyGrad.addColorStop(0.4, '#888888');
+    bodyGrad.addColorStop(1, '#555555');
+    ctx.fillStyle = bodyGrad;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 高光
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.2)';
+    ctx.beginPath();
+    ctx.ellipse(cx - r * 0.3, cy - r * 0.35, r * 0.35, r * 0.22, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    // 描边
     ctx.strokeStyle = '#666666';
-    ctx.lineWidth = 1;
-    ctx.strokeRect(x + s * 1 + 0.5, y + s * 1 + 0.5, s * 6 - 1, s * 6 - 1);
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(cx, cy, r, 0, Math.PI * 2);
+    ctx.stroke();
   }
 }
 
