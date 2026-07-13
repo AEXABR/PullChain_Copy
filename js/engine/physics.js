@@ -148,11 +148,14 @@ function updateLiftWalls() {
       }
     }
     const tile = grid[wr][wc];
-    const canRaise = allPressed;
+    const wantsActivated = allPressed;
+    // 只在墙即将变成 T_WALL（阻塞态）时检查 entityCount，防止碾压实体
+    const wouldBeWall = (tile.liftWall === 'up') ? wantsActivated : !wantsActivated;
+    const canActivate = wantsActivated && !(wouldBeWall && entityCount(wr, wc) >= 2);
     if (tile.liftWall === 'up') {
-      tile.base = canRaise ? T_WALL : T_EMPTY;
+      tile.base = canActivate ? T_WALL : T_EMPTY;
     } else {
-      tile.base = canRaise ? T_EMPTY : T_WALL;
+      tile.base = canActivate ? T_EMPTY : T_WALL;
     }
   }
 }
