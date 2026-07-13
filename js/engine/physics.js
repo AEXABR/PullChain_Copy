@@ -230,8 +230,16 @@ function moveMoths() {
       if (grid[nr][nc].base === T_WALL) continue;
       if (height < tileFootLevel(nr, nc)) continue;
 
-      const destEnt = entityAt(nr, nc);
-      if (destEnt && destEnt.height + destEnt.selfHeight > height) continue;
+      const heroBlock = hero && hero.row === nr && hero.col === nc
+        && hero.height + hero.selfHeight > height;
+      const ballBlock = ball && ball.row === nr && ball.col === nc
+        && ball.height + ball.selfHeight > height;
+      if (heroBlock || ballBlock) continue;
+
+      let crateBlock = false;
+      for (const c of cratesAt(nr, nc))
+        if (c !== crate && c.height + c.selfHeight > height) { crateBlock = true; break; }
+      if (crateBlock) continue;
 
       if (cratesAt(nr, nc).length >= 2) continue;
 
