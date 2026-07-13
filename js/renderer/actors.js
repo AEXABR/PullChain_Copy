@@ -95,11 +95,11 @@ function drawCrateTile(crate) {
   const row = crate.row, col = crate.col;
   const stacked = entityUnder(row, col, crate) !== null;
   const inset = stacked ? 2 : 1;
-  if (crate.crateKey === 'snow') {
+  if (crate.has(TRAITS.MELTS_IN_LIGHT)) {
     drawSnowTile(row, col, inset);
     return;
   }
-  if (crate.crateKey === 'moth') {
+  if (crate.has(TRAITS.FLYING)) {
     const foot = tileFootLevel(row, col);
     const under = entityUnder(row, col, crate);
     const groundH = under ? under.height + under.selfHeight : foot;

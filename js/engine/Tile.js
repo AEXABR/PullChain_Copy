@@ -10,4 +10,27 @@ class Tile {
     this.hasWeb = false;        // 蜘蛛网
     this.hasDepression = false; // 洼地（高度-1）
   }
+
+  // 实体在给定高度能否站在/穿过此格
+  isSolidAt(height) {
+    if (this.base !== T_WALL) return false;
+    // 升降墙降下时，足够高的实体可通过
+    if (this.liftWall !== null) return height < this.footLevel();
+    return true;
+  }
+
+  // 此格的地面高度
+  footLevel() {
+    let lvl = 0;
+    if (this.liftWall !== null && this.base === T_WALL) lvl += 1;
+    if (this.hasDepression) lvl -= 1;
+    return lvl;
+  }
+
+  // 此格对站在上面的实体产生的效果
+  effectsOn(entity) {
+    const fx = {};
+    if (this.hasWeb && !entity.has(TRAITS.FLYING)) fx.rooted = true;
+    return fx;
+  }
 }

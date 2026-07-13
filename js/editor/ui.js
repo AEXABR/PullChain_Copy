@@ -225,10 +225,10 @@ document.addEventListener('keydown', (e) => {
     if (dir) {
       e.preventDefault();
       const moved = tryMoveHero(dir.dr, dir.dc);
-      meltSnow();
+      emit('turnEnd', {});
       updateLiftWalls();
       updateAllHeights();
-      moveMoths();
+      processFliers();
       updateAllHeights();
       statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +
         (ball ? `  球位置: (${ball.row}, ${ball.col}) [${ball.lightOn ? '💡开' : '🌑关'}]` : '') +

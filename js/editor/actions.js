@@ -6,13 +6,13 @@ let lastErasedKey = null;
 function setTile(row, col, value) {
   if (value === T_WALL || value === T_EMPTY) {
     const ent = entityAt(row, col);
-    if (ent instanceof Hero) {
+    if (ent.kind === 'hero') {
       hero = null;
       statusEl.textContent = '⚠ 角色被覆盖，已移除角色';
-    } else if (ent instanceof Ball) {
+    } else if (ent.kind === 'ball') {
       ball = null;
       statusEl.textContent = '⚠ 球被覆盖，已移除球';
-    } else if (ent instanceof Crate) {
+    } else if (ent.kind === 'crate') {
       crates.delete(K(row, col));
       crates.delete(K(row, col) + ':1');
     }

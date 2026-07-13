@@ -107,9 +107,9 @@ function render() {
   if (hero) allEntities.push(hero);
   allEntities.sort((a, b) => a.height - b.height);
   for (const ent of allEntities) {
-    if (ent instanceof Hero)       drawHero(ent);
-    else if (ent instanceof Ball)  drawBall(ent);
-    else if (ent instanceof Crate) drawCrateTile(ent);
+    if (ent.kind === 'hero')       drawHero(ent);
+    else if (ent.kind === 'ball')  drawBall(ent);
+    else if (ent.kind === 'crate') drawCrateTile(ent);
   }
 
   drawGridLines();

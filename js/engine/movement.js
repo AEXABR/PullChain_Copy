@@ -1,4 +1,5 @@
 // 提取自 js/engine.js
+// 重构：trait 判断替代 instanceof，Tile 方法替代散落属性组合，通用堆叠推动替代球骑人特判
 
 function getPushChain(r, c, dr, dc, pusherHeight = -1) {
   const chain = [];
@@ -6,10 +7,10 @@ function getPushChain(r, c, dr, dc, pusherHeight = -1) {
   while (true) {
     if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return null;
     const tile = grid[r][c];
-    if (tile.base === T_WALL && !(tile.liftWall !== null && stepHeight >= tileFootLevel(r, c))) return null;
-    if (stepHeight < tileFootLevel(r, c)) return null;
+    if (tile.isSolidAt(stepHeight)) return null;
+    if (stepHeight < tile.footLevel()) return null;
     const ent = entityForPush(r, c, stepHeight);
-    if (ent && tile.hasWeb) return null;
+    if (ent && tile.effectsOn(ent).rooted) return null;
     if (!ent) return chain;
     if (stepHeight >= ent.height + ent.selfHeight) return chain;
     if (stepHeight !== ent.height) return null;
@@ -24,11 +25,7 @@ function pushChain(chain, dr, dc) {
     const ent = chain[i];
     const oldR = ent.row, oldC = ent.col;
     const newR = ent.row + dr, newC = ent.col + dc;
-    if (ent instanceof Crate) {
-      moveCrateInMap(ent, newR, newC);
-    } else {
-      ent.row = newR; ent.col = newC;
-    }
+    moveEntityInMap(ent, newR, newC);
     moveRiders(oldR, oldC, newR, newC, ent);
   }
 }
@@ -103,9 +100,9 @@ function followBall(prevRow, prevCol) {
       if (!isValid(c)) continue;
       const ent = entityForPush(c.row, c.col, ball.height);
       const canStep = !ent || ball.height >= ent.height + ent.selfHeight;
-      const targetFoot = tileFootLevel(c.row, c.col);
+      const targetFoot = grid[c.row][c.col].footLevel();
       const tile = grid[c.row][c.col];
-      const canAccess = ball.height >= targetFoot && (tile.base !== T_WALL || tile.liftWall !== null);
+      const canAccess = ball.height >= targetFoot && !tile.isSolidAt(ball.height);
       if (canStep && canAccess) {
         ball.row = c.row; ball.col = c.col;
         moveRiders(prevBallRow, prevBallCol, ball.row, ball.col, ball);
@@ -122,13 +119,13 @@ function followBall(prevRow, prevCol) {
 }
 
 function tryMoveHero(dr, dc) {
-  if (grid[hero.row][hero.col].hasWeb) return false;
+  if (grid[hero.row][hero.col].effectsOn(hero).rooted) return false;
   const nr = hero.row + dr, nc = hero.col + dc;
 
   if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return false;
-  const targetFoot = tileFootLevel(nr, nc);
+  const targetFoot = grid[nr][nc].footLevel();
   const targetTile = grid[nr][nc];
-  if (targetTile.base === T_WALL && !(targetTile.liftWall !== null && hero.height >= targetFoot)) return false;
+  if (targetTile.isSolidAt(hero.height)) return false;
 
   if (hero.height < targetFoot) return false;
 
@@ -139,19 +136,20 @@ function tryMoveHero(dr, dc) {
     moveRiders(prevRow, prevCol, nr, nc, hero);
     if (!followBall(prevRow, prevCol)) {
       hero.row = prevRow; hero.col = prevCol;
-      if (ball) ball.toggle();
+      if (ball && ball.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ball.toggle();
       return false;
     }
     return true;
   }
 
+  // 可通行的墙体（升降墙升起但角色高度足够），没有实体阻挡 → 直接站上去
   if (targetTile.base === T_WALL && !targetEnt) {
     const prevRow = hero.row, prevCol = hero.col;
     hero.row = nr; hero.col = nc;
     moveRiders(prevRow, prevCol, nr, nc, hero);
     if (!followBall(prevRow, prevCol)) {
       hero.row = prevRow; hero.col = prevCol;
-      if (ball) ball.toggle();
+      if (ball && ball.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ball.toggle();
       return false;
     }
     return true;
@@ -184,7 +182,7 @@ function tryMoveHero(dr, dc) {
         restoreCrates(savedCrates);
         if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
         hero.row = savedHero.row; hero.col = savedHero.col;
-        ball.toggle();
+        if (ball && ball.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ball.toggle();
         return false;
       }
       return true;
@@ -194,12 +192,16 @@ function tryMoveHero(dr, dc) {
   const chain = getPushChain(nr, nc, dr, dc, hero.height);
   if (chain === null) return false;
 
-  // 球骑在人上时，如果人的高度推不到东西，试试球的高度
-  if (chain.length === 0 && ball && ball.row === hero.row && ball.col === hero.col
-      && ball.height === hero.height + hero.selfHeight) {
-    const ballChain = getPushChain(nr, nc, dr, dc, ball.height);
-    if (ballChain !== null && ballChain.length > 0) {
-      pushChain(ballChain, dr, dc);
+  // 通用化：人推不动时，尝试骑乘者的高度（不特判球）
+  if (chain.length === 0) {
+    const heroTop = hero.height + hero.selfHeight;
+    const maxHeight = topHeightAt(hero.row, hero.col, hero);
+    for (let h = heroTop; h <= maxHeight; h++) {
+      const altChain = getPushChain(nr, nc, dr, dc, h);
+      if (altChain !== null && altChain.length > 0) {
+        pushChain(altChain, dr, dc);
+        break;
+      }
     }
   }
 
@@ -216,7 +218,7 @@ function tryMoveHero(dr, dc) {
     restoreCrates(savedCrates);
     if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
     hero.row = savedHero.row; hero.col = savedHero.col;
-    ball.toggle();
+    if (ball && ball.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ball.toggle();
     return false;
   }
   return true;
