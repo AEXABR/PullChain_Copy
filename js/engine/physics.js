@@ -242,8 +242,7 @@ function moveMoths() {
       moveRiders(oldR, oldC, nr, nc, crate);
 
       updateLiftWalls();
-      updateEntityHeight(ball);
-      syncMothHeight(crate);
+      updateAllHeights();
     }
   }
 }
