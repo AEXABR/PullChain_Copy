@@ -201,7 +201,7 @@ function moveMoths() {
 
   const moths = [];
   for (const [key, crate] of crates) {
-    if (crate.crateKey === 'moth' && !key.endsWith(':1')) {
+    if (crate.crateKey === 'moth') {
       moths.push(crate);
     }
   }
@@ -235,13 +235,11 @@ function moveMoths() {
       const destEnt = entityAt(nr, nc);
       if (destEnt && destEnt.height + destEnt.selfHeight > height) break;
 
-      if (crates.has(K(nr, nc))) break;
+      if (cratesAt(nr, nc).length >= 2) break;
 
-      const oldKey = K(row, col);
-      crates.delete(oldKey);
-      crate.row = nr;
-      crate.col = nc;
-      crates.set(K(nr, nc), crate);
+      const oldR = crate.row, oldC = crate.col;
+      moveCrateInMap(crate, nr, nc);
+      moveRiders(oldR, oldC, nr, nc, crate);
 
       updateLiftWalls();
       updateEntityHeight(ball);
