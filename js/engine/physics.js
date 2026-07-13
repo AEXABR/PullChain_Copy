@@ -148,7 +148,7 @@ function updateLiftWalls() {
       }
     }
     const tile = grid[wr][wc];
-    const canRaise = allPressed && entityCount(wr, wc) < 2;
+    const canRaise = allPressed;
     if (tile.liftWall === 'up') {
       tile.base = canRaise ? T_WALL : T_EMPTY;
     } else {
