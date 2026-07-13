@@ -33,11 +33,20 @@
     const ctx = canvas.getContext('2d');
     const statusEl = document.getElementById('status');
   </script>
-  <!-- 游戏引擎（纯逻辑，无 DOM 依赖） -->
-  <script src="js/engine.js"></script>
-  <!-- 渲染器（依赖 engine.js + ctx） -->
-  <script src="js/renderer.js"></script>
-  <!-- 编辑器 UI（依赖 engine.js + renderer.js） -->
-  <script src="js/editor.js"></script>
+  <!-- engine 层：零依赖，纯逻辑 -->
+  <script src="js/engine/constants.js"></script>
+  <script src="js/engine/Tile.js"></script>
+  <script src="js/engine/entities.js"></script>
+  <script src="js/engine/state.js"></script>
+  <script src="js/engine/movement.js"></script>
+  <script src="js/engine/physics.js"></script>
+  <!-- editor 层：依赖 engine -->
+  <script src="js/editor/editor-state.js"></script>
+  <script src="js/editor/actions.js"></script>
+  <script src="js/editor/ui.js"></script>
+  <!-- renderer 层：依赖 engine + editor-state -->
+  <script src="js/renderer/tiles.js"></script>
+  <script src="js/renderer/actors.js"></script>
+  <script src="js/renderer/render.js"></script>
 </body>
 </html>
