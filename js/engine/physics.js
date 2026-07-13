@@ -239,7 +239,9 @@ function moveMoths() {
       moveCrateInMap(crate, nr, nc);
       moveRiders(oldR, oldC, nr, nc, crate);
       anyMoved = true;
+    }
 
+    if (anyMoved) {
       updateLiftWalls();
       updateAllHeights();
     }
