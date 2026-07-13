@@ -194,6 +194,15 @@ function tryMoveHero(dr, dc) {
   const chain = getPushChain(nr, nc, dr, dc, hero.height);
   if (chain === null) return false;
 
+  // 球骑在人上时，如果人的高度推不到东西，试试球的高度
+  if (chain.length === 0 && ball && ball.row === hero.row && ball.col === hero.col
+      && ball.height === hero.height + hero.selfHeight) {
+    const ballChain = getPushChain(nr, nc, dr, dc, ball.height);
+    if (ballChain !== null && ballChain.length > 0) {
+      pushChain(ballChain, dr, dc);
+    }
+  }
+
   const savedCrates = snapshotCrates();
   const savedHero = { row: hero.row, col: hero.col };
   const savedBall = ball ? { row: ball.row, col: ball.col } : null;
