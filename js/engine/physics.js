@@ -244,6 +244,7 @@ function moveMoths() {
       crates.set(K(nr, nc), crate);
 
       updateLiftWalls();
+      updateEntityHeight(ball);
       syncMothHeight(crate);
     }
   }
