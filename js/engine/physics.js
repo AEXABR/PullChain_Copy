@@ -242,7 +242,7 @@ function moveMoths() {
       moveRiders(oldR, oldC, nr, nc, crate);
 
       updateLiftWalls();
-      updateAllHeights();
+      syncMothHeight(crate);
     }
   }
 }
