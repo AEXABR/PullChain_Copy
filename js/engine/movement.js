@@ -218,7 +218,7 @@ function tryMoveHero(dr, dc) {
 
   const savedCrates = snapshotCrates();
   const savedHero = { row: hero.row, col: hero.col };
-  const savedBall = ball ? { row: ball.row, ball.col: ball.col } : null;
+  const savedBall = ball ? { row: ball.row, col: ball.col } : null;
 
   const prevRow = hero.row, prevCol = hero.col;
   pushChain(chain, dr, dc);
