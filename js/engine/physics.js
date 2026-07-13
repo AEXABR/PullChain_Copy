@@ -1,10 +1,14 @@
 // 提取自 js/engine.js
 
-function entityPriority(ent) {
-  if (ent instanceof Hero) return 3;
-  if (ent instanceof Ball) return 2;
-  if (ent instanceof Crate) return 1;
-  return 0;
+function topHeightAt(row, col, exclude) {
+  let top = tileFootLevel(row, col);
+  if (hero && hero !== exclude && hero.row === row && hero.col === col)
+    top = Math.max(top, hero.height + hero.selfHeight);
+  if (ball && ball !== exclude && ball.row === row && ball.col === col)
+    top = Math.max(top, ball.height + ball.selfHeight);
+  for (const c of cratesAt(row, col))
+    if (c !== exclude) top = Math.max(top, c.height + c.selfHeight);
+  return top;
 }
 
 function entityUnder(r, c, self) {
@@ -12,8 +16,7 @@ function entityUnder(r, c, self) {
   if (allCrates.length === 2 && allCrates[1] === self) return allCrates[0];
   const check = (ent) => {
     if (!ent || ent === self || ent.row !== r || ent.col !== c) return false;
-    return ent.height < self.height ||
-          (ent.height === self.height && entityPriority(ent) < entityPriority(self));
+    return ent.height < self.height;
   };
   if (check(ball))   return ball;
   if (check(hero))   return hero;
@@ -32,7 +35,7 @@ function tileFootLevel(r, c) {
 
 function updateEntityHeight(ent) {
   if (!ent) return;
-  if (ent instanceof Crate && ent.crateKey === 'moth') return;
+  if (ent instanceof Crate && ent.crateKey === 'moth') return; // 飞蛾不随地形落地
   const r = ent.row, c = ent.col;
   const under = entityUnder(r, c, ent);
   if (under) {
@@ -42,8 +45,82 @@ function updateEntityHeight(ent) {
   }
 }
 
+// 把单个 crate 在 Map 中的位置从旧坐标更新到新坐标
+function moveCrateInMap(crate, newRow, newCol) {
+  const oldKey = K(crate.row, crate.col);
+  const stackedKey = oldKey + ':1';
+  if (crates.get(oldKey) === crate) crates.delete(oldKey);
+  else if (crates.get(stackedKey) === crate) crates.delete(stackedKey);
+  crate.row = newRow; crate.col = newCol;
+  const newKey = K(newRow, newCol);
+  const existing = crates.get(newKey);
+  if (!existing) {
+    crates.set(newKey, crate);
+  } else if (crate.height < existing.height) {
+    // 新来的更矮 → 放底层，原有顶上
+    crates.delete(newKey);
+    crates.set(newKey, crate);
+    crates.set(newKey + ':1', existing);
+  } else {
+    // 新来的更高或同高 → 放顶层
+    crates.set(newKey + ':1', crate);
+  }
+}
+
+// 目标格是否已有实体占据骑乘者的高度
+function riderBlocked(rider, toRow, toCol) {
+  const h = rider.height;
+  if (hero && hero !== rider && hero.row === toRow && hero.col === toCol && hero.height === h) return true;
+  if (ball && ball !== rider && ball.row === toRow && ball.col === toCol && ball.height === h) return true;
+  for (const c of cratesAt(toRow, toCol))
+    if (c !== rider && c.height === h) return true;
+  return false;
+}
+
+// 骑在 mover 上面的实体，跟着一起移动（递归处理多层堆叠）
+function moveRiders(fromRow, fromCol, toRow, toCol, mover) {
+  const moverTop = mover.height + mover.selfHeight;
+  const riders = [];
+  if (hero && hero !== mover && hero.row === fromRow && hero.col === fromCol
+      && hero.height === moverTop) riders.push(hero);
+  if (ball && ball !== mover && ball.row === fromRow && ball.col === fromCol
+      && ball.height === moverTop) riders.push(ball);
+  for (const c of crates.values()) {
+    if (c !== mover && c.row === fromRow && c.col === fromCol
+        && c.height === moverTop) riders.push(c);
+  }
+  for (const rider of riders) {
+    if (riderBlocked(rider, toRow, toCol)) continue;
+    const oldR = rider.row, oldC = rider.col;
+    if (rider instanceof Crate) {
+      moveCrateInMap(rider, toRow, toCol);
+    } else {
+      rider.row = toRow; rider.col = toCol;
+    }
+    moveRiders(oldR, oldC, toRow, toCol, rider);
+  }
+}
+
+function syncMothHeight(crate) {
+  const under = entityUnder(crate.row, crate.col, crate);
+  if (under) {
+    crate.height = under.height + under.selfHeight;
+    return;
+  }
+  const tile = grid[crate.row][crate.col];
+  if (tile.liftWall !== null) {
+    // 站在升降墙格子上：高度跟随墙的状态
+    crate.height = (tile.base === T_WALL) ? 1 : 0;
+  }
+  // 否则：保持当前飞行高度不变（不落地）
+}
+
 function updateAllHeights() {
   for (const crate of crates.values()) updateEntityHeight(crate);
+  // 飞蛾在球和英雄之前同步——其他实体可能站在飞蛾上
+  for (const crate of crates.values()) {
+    if (crate.crateKey === 'moth') syncMothHeight(crate);
+  }
   if (ball) updateEntityHeight(ball);
   if (hero) updateEntityHeight(hero);
 }
@@ -167,6 +244,7 @@ function moveMoths() {
       crates.set(K(nr, nc), crate);
 
       updateLiftWalls();
+      syncMothHeight(crate);
     }
   }
 }

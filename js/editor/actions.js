@@ -76,12 +76,8 @@ function placeCrate(row, col) {
     statusEl.textContent = '⚠ 此处已有两个箱子！';
     return;
   }
-  if (crate.crateKey === 'moth') {
-    const under = entityUnder(row, col, crate);
-    crate.height = under ? under.height + under.selfHeight : tileFootLevel(row, col);
-  }
   const type = CRATES[editor.currentCrateKey];
-  updateAllHeights();
+  crate.height = topHeightAt(row, col, crate);
   statusEl.textContent = `${type.emoji} ${type.name}已放置`;
   render();
 }
@@ -229,7 +225,7 @@ function placeHero(row, col) {
     return;
   }
   hero = new Hero(row, col);
-  updateAllHeights();
+  hero.height = topHeightAt(row, col, hero);
   if (!ball) {
     setMode('place_ball');
     statusEl.textContent = '✅ 角色已放置！现在请放置球';
@@ -247,7 +243,7 @@ function placeBall(row, col) {
     return;
   }
   ball = new Ball(row, col);
-  updateAllHeights();
+  ball.height = topHeightAt(row, col, ball);
   setMode('play');
   statusEl.textContent = '✅ 球已放置！方向键/WASD 移动角色';
   render();

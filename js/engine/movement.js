@@ -8,7 +8,7 @@ function getPushChain(r, c, dr, dc, pusherHeight = -1) {
     const tile = grid[r][c];
     if (tile.base === T_WALL && !(tile.liftWall !== null && stepHeight >= tileFootLevel(r, c))) return null;
     if (stepHeight < tileFootLevel(r, c)) return null;
-    const ent = entityForPush(r, c);
+    const ent = entityForPush(r, c, stepHeight);
     if (ent && tile.hasWeb) return null;
     if (!ent) return chain;
     if (stepHeight >= ent.height + ent.selfHeight) return chain;
@@ -22,42 +22,14 @@ function getPushChain(r, c, dr, dc, pusherHeight = -1) {
 function pushChain(chain, dr, dc) {
   for (let i = chain.length - 1; i >= 0; i--) {
     const ent = chain[i];
+    const oldR = ent.row, oldC = ent.col;
     const newR = ent.row + dr, newC = ent.col + dc;
     if (ent instanceof Crate) {
-      const oldKey = K(ent.row, ent.col);
-      const stackedKey = oldKey + ':1';
-      const atBottom = crates.get(oldKey) === ent;
-      const atTop = crates.get(stackedKey) === ent;
-      let stacked = null;
-      if (atBottom) {
-        stacked = crates.get(stackedKey);
-      } else if (atTop) {
-        stacked = crates.get(oldKey);
-      }
-      if (atBottom) crates.delete(oldKey);
-      if (atTop) crates.delete(stackedKey);
-      if (stacked) {
-        const sk = K(stacked.row, stacked.col);
-        crates.delete(sk);
-        crates.delete(sk + ':1');
-      }
-      ent.row = newR; ent.col = newC;
-      const destKey = K(newR, newC);
-      const destHadCrate = crates.has(destKey);
-      if (destHadCrate) {
-        crates.set(destKey + ':1', ent);
-      } else {
-        crates.set(destKey, ent);
-      }
-      if (stacked) {
-        stacked.row = newR; stacked.col = newC;
-        if (!destHadCrate) {
-          crates.set(destKey + ':1', stacked);
-        }
-      }
+      moveCrateInMap(ent, newR, newC);
     } else {
       ent.row = newR; ent.col = newC;
     }
+    moveRiders(oldR, oldC, newR, newC, ent);
   }
 }
 
@@ -122,19 +94,21 @@ function followBall(prevRow, prevCol) {
     }
     if (needsPush) pushChain(chain, c.pushDr, c.pushDc);
     ball.row = c.row; ball.col = c.col;
+    moveRiders(prevBallRow, prevBallCol, ball.row, ball.col, ball);
     break;
   }
 
   if (dist(hero.row, hero.col, ball.row, ball.col) > 1) {
     for (const c of candidates) {
       if (!isValid(c)) continue;
-      const ent = entityForPush(c.row, c.col);
+      const ent = entityForPush(c.row, c.col, ball.height);
       const canStep = !ent || ball.height >= ent.height + ent.selfHeight;
       const targetFoot = tileFootLevel(c.row, c.col);
       const tile = grid[c.row][c.col];
       const canAccess = ball.height >= targetFoot && (tile.base !== T_WALL || tile.liftWall !== null);
       if (canStep && canAccess) {
         ball.row = c.row; ball.col = c.col;
+        moveRiders(prevBallRow, prevBallCol, ball.row, ball.col, ball);
         break;
       }
     }
@@ -162,6 +136,7 @@ function tryMoveHero(dr, dc) {
   if (targetEnt && hero.height >= targetEnt.height + targetEnt.selfHeight) {
     const prevRow = hero.row, prevCol = hero.col;
     hero.row = nr; hero.col = nc;
+    moveRiders(prevRow, prevCol, nr, nc, hero);
     if (!followBall(prevRow, prevCol)) {
       hero.row = prevRow; hero.col = prevCol;
       if (ball) ball.toggle();
@@ -173,6 +148,7 @@ function tryMoveHero(dr, dc) {
   if (targetTile.base === T_WALL && !targetEnt) {
     const prevRow = hero.row, prevCol = hero.col;
     hero.row = nr; hero.col = nc;
+    moveRiders(prevRow, prevCol, nr, nc, hero);
     if (!followBall(prevRow, prevCol)) {
       hero.row = prevRow; hero.col = prevCol;
       if (ball) ball.toggle();
@@ -201,7 +177,9 @@ function tryMoveHero(dr, dc) {
       } else {
         crates.set(destKey, topCrate);
       }
+      moveRiders(nr, nc, topDestR, topDestC, topCrate);
       hero.row = nr; hero.col = nc;
+      moveRiders(prevRow, prevCol, nr, nc, hero);
       if (!followBall(prevRow, prevCol)) {
         restoreCrates(savedCrates);
         if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
@@ -223,6 +201,7 @@ function tryMoveHero(dr, dc) {
   const prevRow = hero.row, prevCol = hero.col;
   pushChain(chain, dr, dc);
   hero.row = nr; hero.col = nc;
+  moveRiders(prevRow, prevCol, nr, nc, hero);
 
   if (!followBall(prevRow, prevCol)) {
     restoreCrates(savedCrates);

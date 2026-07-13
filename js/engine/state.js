@@ -37,10 +37,14 @@ function entityAt(r, c) {
   if (ball && ball.row === r && ball.col === c) return ball;
   return crateAt(r, c);
 }
-function entityForPush(r, c) {
-  if (ball && ball.row === r && ball.col === c) return ball;
+function entityForPush(r, c, atHeight) {
   const key = K(r, c);
-  return crates.get(key) || crates.get(key + ':1') || null;
+  const b = crates.get(key);
+  if (b && b.height === atHeight) return b;
+  const t = crates.get(key + ':1');
+  if (t && t.height === atHeight) return t;
+  if (ball && ball.row === r && ball.col === c && ball.height === atHeight) return ball;
+  return null;
 }
 function isSolid(r, c)     { return grid[r][c].base === T_WALL || crateAt(r, c) !== null; }
 

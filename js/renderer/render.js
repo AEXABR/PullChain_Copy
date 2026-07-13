@@ -105,10 +105,7 @@ function render() {
   for (const crate of crates.values()) allEntities.push(crate);
   if (ball) allEntities.push(ball);
   if (hero) allEntities.push(hero);
-  allEntities.sort((a, b) => {
-    if (a.height !== b.height) return a.height - b.height;
-    return entityPriority(a) - entityPriority(b);
-  });
+  allEntities.sort((a, b) => a.height - b.height);
   for (const ent of allEntities) {
     if (ent instanceof Hero)       drawHero(ent);
     else if (ent instanceof Ball)  drawBall(ent);
