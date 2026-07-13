@@ -206,40 +206,39 @@ function moveMoths() {
     }
   }
 
-  for (const crate of moths) {
-    while (true) {
-      if (!ball || !ball.lightOn) break;
+  let anyMoved = true;
+  while (anyMoved) {
+    anyMoved = false;
+
+    for (const crate of moths) {
+      if (!ball || !ball.lightOn) return;
 
       const { row, col, height } = crate;
 
-      if (row !== ball.row && col !== ball.col) break;
-
-      if (height !== ball.height) break;
-
-      if (!hasLineOfSight(row, col, ball.row, ball.col)) break;
+      if (row !== ball.row && col !== ball.col) continue;
+      if (height !== ball.height) continue;
+      if (!hasLineOfSight(row, col, ball.row, ball.col)) continue;
 
       const dr = Math.sign(ball.row - row);
       const dc = Math.sign(ball.col - col);
-
-      if (dr === 0 && dc === 0) break;
+      if (dr === 0 && dc === 0) continue;
 
       const nr = row + dr;
       const nc = col + dc;
 
-      if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) break;
-
-      if (grid[nr][nc].base === T_WALL) break;
-
-      if (height < tileFootLevel(nr, nc)) break;
+      if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) continue;
+      if (grid[nr][nc].base === T_WALL) continue;
+      if (height < tileFootLevel(nr, nc)) continue;
 
       const destEnt = entityAt(nr, nc);
-      if (destEnt && destEnt.height + destEnt.selfHeight > height) break;
+      if (destEnt && destEnt.height + destEnt.selfHeight > height) continue;
 
-      if (cratesAt(nr, nc).length >= 2) break;
+      if (cratesAt(nr, nc).length >= 2) continue;
 
       const oldR = crate.row, oldC = crate.col;
       moveCrateInMap(crate, nr, nc);
       moveRiders(oldR, oldC, nr, nc, crate);
+      anyMoved = true;
 
       updateLiftWalls();
       updateAllHeights();
