@@ -80,8 +80,8 @@ function render() {
         drawEmptyTile(r, c);
         if (tile.hasWater) {
           drawWaterTile(r, c);
-        } else if (tile.hasDepression) {
-          drawDepressionTile(r, c);
+        } else if (tile.hasHighland) {
+          drawHighlandTile(r, c);
         }
         if (tile.isPlate) drawPlateTile(r, c);
         if (tile.liftWall !== null) {

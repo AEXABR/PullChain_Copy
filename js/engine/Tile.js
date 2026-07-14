@@ -8,7 +8,7 @@ class Tile {
     this.isPlate = false;       // 踏板
     this.hasWater = false;      // 水渍
     this.hasWeb = false;        // 蜘蛛网
-    this.hasDepression = false; // 洼地（高度-1）
+    this.hasHighland = false; // 高地（高度+1）
   }
 
   // 实体在给定高度能否站在/穿过此格
@@ -23,7 +23,7 @@ class Tile {
   footLevel() {
     let lvl = 0;
     if (this.liftWall !== null && this.base === T_WALL) lvl += 1;
-    if (this.hasDepression) lvl -= 1;
+    if (this.hasHighland) lvl += 1;
     return lvl;
   }
 

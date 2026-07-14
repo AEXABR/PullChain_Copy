@@ -142,20 +142,20 @@ function drawWebTile(row, col) {
   ctx.fillRect(cx - 1.5, cy - 1.5, 3, 3);
 }
 
-function drawDepressionTile(row, col) {
+function drawHighlandTile(row, col) {
   const x = col * TILE_SIZE;
   const y = row * TILE_SIZE;
   const s = TILE_SIZE / 8;
 
-  ctx.fillStyle = '#2a2a3a';
+  ctx.fillStyle = '#4a4a3a';
   ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
   const grad = ctx.createRadialGradient(x + TILE_SIZE/2, y + TILE_SIZE/2, s*0.5, x + TILE_SIZE/2, y + TILE_SIZE/2, s*3.5);
-  grad.addColorStop(0, '#1a1a28');
-  grad.addColorStop(0.6, '#252535');
-  grad.addColorStop(1, '#3a3a4e');
+  grad.addColorStop(0, '#6a6a4e');
+  grad.addColorStop(0.6, '#4a4a38');
+  grad.addColorStop(1, '#3a3a2e');
   ctx.fillStyle = grad;
   ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
-  ctx.strokeStyle = 'rgba(0,0,0,0.3)';
+  ctx.strokeStyle = 'rgba(255,255,200,0.2)';
   ctx.lineWidth = 2;
   ctx.strokeRect(x + s, y + s, TILE_SIZE - s*2, TILE_SIZE - s*2);
 }

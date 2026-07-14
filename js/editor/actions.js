@@ -22,7 +22,7 @@ function setTile(row, col, value) {
     tile.isPlate = false;
     tile.liftWall = null;
     tile.diagCorner = null;
-    tile.hasDepression = false;
+    tile.hasHighland = false;
     const key = K(row, col);
     for (let i = wireLinks.length - 1; i >= 0; i--) {
       if (wireLinks[i].plate === key || wireLinks[i].wall === key) {
@@ -118,20 +118,20 @@ function placeLiftWall(row, col) {
   statusEl.textContent = `⇅ 升降墙已放置(${typeLabel})`;
 }
 
-function placeDepression(row, col) {
+function placeHighland(row, col) {
   const tile = grid[row][col];
   if (tile.base === T_WALL) {
-    statusEl.textContent = '⚠ 不能把洼地放在墙体上！';
+    statusEl.textContent = '⚠ 不能把高地放在墙体上！';
     return;
   }
-  if (tile.hasDepression) {
-    statusEl.textContent = '⚠ 此处已有洼地！';
+  if (tile.hasHighland) {
+    statusEl.textContent = '⚠ 此处已有高地！';
     return;
   }
-  tile.hasDepression = true;
+  tile.hasHighland = true;
   tile.hasWater = false;
   render();
-  statusEl.textContent = '\u{1F573}️ 洼地已放置（高度-1）';
+  statusEl.textContent = '⛰️ 高地已放置（高度+1）';
 }
 
 function eraseTop(row, col) {
@@ -203,9 +203,9 @@ function eraseTop(row, col) {
     render();
     return;
   }
-  if (tile.hasDepression) {
-    tile.hasDepression = false;
-    statusEl.textContent = '\u{1F5D1} 洼地已擦除';
+  if (tile.hasHighland) {
+    tile.hasHighland = false;
+    statusEl.textContent = '\u{1F5D1} 高地已擦除';
     render();
     return;
   }
@@ -259,5 +259,5 @@ const PLACE_ACTIONS = {
   web:         (r, c) => placeWeb(r, c),
   plate:       (r, c) => placePlate(r, c),
   liftwall:    (r, c) => placeLiftWall(r, c),
-  depression:  (r, c) => placeDepression(r, c),
+  highland:  (r, c) => placeHighland(r, c),
 };
