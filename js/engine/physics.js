@@ -106,7 +106,7 @@ function syncFlyingHeight(ent) {
   }
   const tile = grid[ent.row][ent.col];
   if (tile.liftWall !== null) {
-    ent.height = (tile.base === T_WALL) ? 1 : 0;
+    ent.height = tile.footLevel();
   }
   // 否则：保持当前飞行高度不变（不落地）
 }
@@ -114,11 +114,11 @@ function syncFlyingHeight(ent) {
 function updateAllHeights() {
   // Pass 1: 地面实体落地
   for (const ent of allEntities()) {
-    if (!ent.has(TRAITS.FLYING)) updateEntityHeight(ent);
+    if (ent.wantsGroundSnap()) updateEntityHeight(ent);
   }
   // Pass 2: 飞行实体同步（可能站在已落地的实体上）
   for (const ent of allEntities()) {
-    if (ent.has(TRAITS.FLYING)) syncFlyingHeight(ent);
+    if (!ent.wantsGroundSnap()) syncFlyingHeight(ent);
   }
 }
 
@@ -199,7 +199,7 @@ function processFliers() {
         }
       }
       if (blocked) continue;
-      if (entitiesAt(nr, nc).length >= 2) continue;
+      if (cratesAt(nr, nc).length >= 2) continue;
 
       const oldR = ent.row, oldC = ent.col;
       moveEntityInMap(ent, nr, nc);

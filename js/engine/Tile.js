@@ -39,6 +39,8 @@ class Tile {
     return this.hasSkylight ? Infinity : CEILING;
   }
 
+  // 通过 liftWall 字符串映射到 WallBehaviors 策略对象
+  // 依赖：WallBehaviors 定义在 physics.js（在 Tile.js 之后加载，但方法在运行时才调用）
   getWallBehavior() {
     return this.liftWall ? WallBehaviors[this.liftWall] : null;
   }

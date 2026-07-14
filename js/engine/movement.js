@@ -100,7 +100,7 @@ function followOneLeashed(leashedEnt, prevRow, prevCol) {
       if (c.corner.c2chain) pushChain(c.corner.c2chain, 0, dc);
     }
     if (needsPush) pushChain(chain, c.pushDr, c.pushDc);
-    leashedEnt.row = c.row; leashedEnt.col = c.col;
+    moveEntityInMap(leashedEnt, c.row, c.col);
     moveRiders(prevEntRow, prevEntCol, leashedEnt.row, leashedEnt.col, leashedEnt);
     break;
   }
@@ -115,7 +115,7 @@ function followOneLeashed(leashedEnt, prevRow, prevCol) {
       const tile = grid[c.row][c.col];
       const canAccess = leashedEnt.height >= targetFoot && !tile.isSolidAt(leashedEnt.height);
       if (canStep && canAccess) {
-        leashedEnt.row = c.row; leashedEnt.col = c.col;
+        moveEntityInMap(leashedEnt, c.row, c.col);
         moveRiders(prevEntRow, prevEntCol, leashedEnt.row, leashedEnt.col, leashedEnt);
         break;
       }
@@ -123,7 +123,7 @@ function followOneLeashed(leashedEnt, prevRow, prevCol) {
   }
 
   if (dist(hero.row, hero.col, leashedEnt.row, leashedEnt.col) > 1) {
-    leashedEnt.row = prevEntRow; leashedEnt.col = prevEntCol;
+    moveEntityInMap(leashedEnt, prevEntRow, prevEntCol);
     return false;
   }
   return true;
