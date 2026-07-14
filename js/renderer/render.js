@@ -84,7 +84,6 @@ function render() {
           drawHighlandTile(r, c);
         }
         if (tile.isPlate) drawPlateTile(r, c);
-        if (tile.hasSkylight) drawSkylightTile(r, c);
         if (tile.liftWall !== null) {
           drawLiftWallTile(r, c, false);
         } else if (tile.hasWeb) {
@@ -111,6 +110,12 @@ function render() {
     if (ent.kind === 'hero')       drawHero(ent);
     else if (ent.kind === 'ball')  drawBall(ent);
     else if (ent.kind === 'crate') drawCrateTile(ent);
+  }
+  // 天窗渲染在实体之上，避免被遮住
+  for (let r = 0; r < GRID_SIZE; r++) {
+    for (let c = 0; c < GRID_SIZE; c++) {
+      if (grid[r][c].hasSkylight) drawSkylightTile(r, c);
+    }
   }
 
   drawGridLines();
