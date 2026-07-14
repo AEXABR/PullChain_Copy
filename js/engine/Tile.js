@@ -31,7 +31,7 @@ class Tile {
   // 此格对站在上面的实体产生的效果
   effectsOn(entity) {
     const fx = {};
-    if (this.hasWeb && !entity.has(TRAITS.FLYING)) fx.rooted = true;
+    if (this.hasWeb) fx.rooted = true;
     return fx;
   }
   // 天窗格无高度上限，普通格为 CEILING(2)

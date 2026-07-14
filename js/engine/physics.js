@@ -181,6 +181,7 @@ function processFliers() {
       if (row !== target.row && col !== target.col) continue;
       if (height !== target.height) continue;
       if (!hasLineOfSight(row, col, target.row, target.col)) continue;
+      if (grid[row][col].effectsOn(ent).rooted) continue;
 
       const dr = Math.sign(target.row - row);
       const dc = Math.sign(target.col - col);
