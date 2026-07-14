@@ -272,7 +272,7 @@ function updateLiftWalls() {
     const wouldExceedCeiling = isRising && (topHeightAt(wr, wc) + 1) > tile.ceilingHeight();
     const canActivate = wantsActivated && !wouldExceedCeiling;
 
-    tile.base = canActivated
+    tile.base = canActivate
       ? (behavior.wallWhenActivated ? T_WALL : T_EMPTY)
       : (behavior.wallWhenActivated ? T_EMPTY : T_WALL);
   }
