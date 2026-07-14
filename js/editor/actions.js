@@ -16,14 +16,7 @@ function setTile(row, col, value) {
       crates.delete(K(row, col));
       crates.delete(K(row, col) + ':1');
     }
-    const tile = grid[row][col];
-    tile.hasWater = false;
-    tile.hasWeb = false;
-    tile.isPlate = false;
-    tile.liftWall = null;
-    tile.diagCorner = null;
-    tile.hasHighland = false;
-    tile.hasSkylight = false;
+    grid[row][col].reset();
     const key = K(row, col);
     for (let i = wireLinks.length - 1; i >= 0; i--) {
       if (wireLinks[i].plate === key || wireLinks[i].wall === key) {
@@ -150,92 +143,82 @@ function placeSkylight(row, col) {
   statusEl.textContent = '🔲 天窗已放置（取消高度上限）';
 }
 
-function eraseTop(row, col) {
-  const key = K(row, col);
-  const tile = grid[row][col];
+// 擦除优先级策略表（从高到低，首个命中即执行）
+const ERASE_ACTIONS = [
+  {
+    test: (r, c) => hero && hero.row === r && hero.col === c,
+    action: (r, c) => { hero = null; return '🗑 角色已擦除'; },
+  },
+  {
+    test: (r, c) => ball && ball.row === r && ball.col === c,
+    action: (r, c) => { ball = null; return '🗑 球已擦除'; },
+  },
+  {
+    test: (r, c) => crates.has(K(r, c) + ':1'),
+    action: (r, c) => { crates.delete(K(r, c) + ':1'); return '🗑 上层箱子已擦除'; },
+  },
+  {
+    test: (r, c) => crates.has(K(r, c)),
+    action: (r, c) => { crates.delete(K(r, c)); return '🗑 箱子已擦除'; },
+  },
+  {
+    test: (r, c) => grid[r][c].hasWeb,
+    action: (r, c) => { grid[r][c].hasWeb = false; return '🗑 蜘蛛网已擦除'; },
+  },
+  {
+    test: (r, c) => grid[r][c].isPlate,
+    action: (r, c) => {
+      grid[r][c].isPlate = false;
+      const key = K(r, c);
+      for (let i = wireLinks.length - 1; i >= 0; i--) {
+        if (wireLinks[i].plate === key) wireLinks.splice(i, 1);
+      }
+      if (editor.wireStart === key) editor.wireStart = null;
+      return '🗑 踏板已擦除';
+    },
+  },
+  {
+    test: (r, c) => grid[r][c].liftWall !== null,
+    action: (r, c) => {
+      grid[r][c].liftWall = null;
+      grid[r][c].base = T_EMPTY;
+      const key = K(r, c);
+      for (let i = wireLinks.length - 1; i >= 0; i--) {
+        if (wireLinks[i].wall === key) wireLinks.splice(i, 1);
+      }
+      if (editor.wireStart === key) editor.wireStart = null;
+      return '🗑 升降墙已擦除';
+    },
+  },
+  {
+    test: (r, c) => grid[r][c].base === T_WALL && grid[r][c].diagCorner && grid[r][c].diagCorner.length > 0,
+    action: (r, c) => { grid[r][c].diagCorner = null; return '🗑 斜角缺口已擦除（保留墙体）'; },
+  },
+  {
+    test: (r, c) => grid[r][c].base === T_WALL,
+    action: (r, c) => { grid[r][c].base = T_EMPTY; return '🗑 墙体已擦除'; },
+  },
+  {
+    test: (r, c) => grid[r][c].hasHighland,
+    action: (r, c) => { grid[r][c].hasHighland = false; return '🗑 高地已擦除'; },
+  },
+  {
+    test: (r, c) => grid[r][c].hasSkylight,
+    action: (r, c) => { grid[r][c].hasSkylight = false; return '🗑 天窗已擦除'; },
+  },
+  {
+    test: (r, c) => grid[r][c].hasWater,
+    action: (r, c) => { grid[r][c].hasWater = false; return '🗑 水渍已擦除'; },
+  },
+];
 
-  if (hero && hero.row === row && hero.col === col) {
-    hero = null;
-    statusEl.textContent = '\u{1F5D1} 角色已擦除';
-    render();
-    return;
-  }
-  if (ball && ball.row === row && ball.col === col) {
-    ball = null;
-    statusEl.textContent = '\u{1F5D1} 球已擦除';
-    render();
-    return;
-  }
-  const topCrate = crates.get(key + ':1');
-  if (topCrate) {
-    crates.delete(key + ':1');
-    statusEl.textContent = '\u{1F5D1} 上层箱子已擦除';
-    render();
-    return;
-  }
-  const bottomCrate = crates.get(key);
-  if (bottomCrate) {
-    crates.delete(key);
-    statusEl.textContent = '\u{1F5D1} 箱子已擦除';
-    render();
-    return;
-  }
-  if (tile.hasWeb) {
-    tile.hasWeb = false;
-    statusEl.textContent = '\u{1F5D1} 蜘蛛网已擦除';
-    render();
-    return;
-  }
-  if (tile.isPlate) {
-    tile.isPlate = false;
-    for (let i = wireLinks.length - 1; i >= 0; i--) {
-      if (wireLinks[i].plate === key) wireLinks.splice(i, 1);
+function eraseTop(row, col) {
+  for (const entry of ERASE_ACTIONS) {
+    if (entry.test(row, col)) {
+      statusEl.textContent = entry.action(row, col);
+      render();
+      return;
     }
-    if (editor.wireStart === key) editor.wireStart = null;
-    statusEl.textContent = '\u{1F5D1} 踏板已擦除';
-    render();
-    return;
-  }
-  if (tile.liftWall !== null) {
-    tile.liftWall = null;
-    tile.base = T_EMPTY;
-    for (let i = wireLinks.length - 1; i >= 0; i--) {
-      if (wireLinks[i].wall === key) wireLinks.splice(i, 1);
-    }
-    if (editor.wireStart === key) editor.wireStart = null;
-    statusEl.textContent = '\u{1F5D1} 升降墙已擦除';
-    render();
-    return;
-  }
-  if (tile.base === T_WALL && tile.diagCorner && tile.diagCorner.length > 0) {
-    tile.diagCorner = null;
-    statusEl.textContent = '\u{1F5D1} 斜角缺口已擦除（保留墙体）';
-    render();
-    return;
-  }
-  if (tile.base === T_WALL) {
-    tile.base = T_EMPTY;
-    statusEl.textContent = '\u{1F5D1} 墙体已擦除';
-    render();
-    return;
-  }
-  if (tile.hasHighland) {
-    tile.hasHighland = false;
-    statusEl.textContent = '\u{1F5D1} 高地已擦除';
-    render();
-    return;
-  }
-  if (tile.hasSkylight) {
-    tile.hasSkylight = false;
-    statusEl.textContent = '\u{1F5D1} 天窗已擦除';
-    render();
-    return;
-  }
-  if (tile.hasWater) {
-    tile.hasWater = false;
-    statusEl.textContent = '\u{1F5D1} 水渍已擦除';
-    render();
-    return;
   }
   statusEl.textContent = '该格已空，无可擦除';
 }

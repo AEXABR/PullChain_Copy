@@ -39,6 +39,17 @@ class Tile {
     return this.hasSkylight ? Infinity : CEILING;
   }
 
+  // 重置所有属性（保留 base）
+  reset() {
+    this.diagCorner = null;
+    this.liftWall = null;
+    this.isPlate = false;
+    this.hasWater = false;
+    this.hasWeb = false;
+    this.hasHighland = false;
+    this.hasSkylight = false;
+  }
+
   // 通过 liftWall 字符串映射到 WallBehaviors 策略对象
   // 依赖：WallBehaviors 定义在 physics.js（在 Tile.js 之后加载，但方法在运行时才调用）
   getWallBehavior() {
