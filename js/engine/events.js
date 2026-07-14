@@ -44,3 +44,17 @@ on('turnEnd', () => {
     }
   }
 });
+
+// --- 注册回合机制（声明式，替代主循环中的硬编码调用序列） ---
+
+// 升降墙更新
+on('turnEnd', updateLiftWalls);
+
+// 高度同步
+on('turnEnd', updateAllHeights);
+
+// 飞蛾飞行（内部会触发升降墙+高度同步）
+on('turnEnd', processFliers);
+
+// 飞蛾飞行后再次同步高度
+on('turnEnd', updateAllHeights);

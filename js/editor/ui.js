@@ -230,12 +230,8 @@ document.addEventListener('keydown', (e) => {
     const dir = KEY_DIR[e.key];
     if (dir) {
       e.preventDefault();
-      const moved = tryMoveHero(dir.dr, dir.dc);
+      tryMoveHero(dir.dr, dir.dc);
       emit('turnEnd', {});
-      updateLiftWalls();
-      updateAllHeights();
-      processFliers();
-      updateAllHeights();
       statusEl.textContent = `角色位置: (${hero.row}, ${hero.col})` +
         (ball ? `  球位置: (${ball.row}, ${ball.col}) [${ball.lightOn ? '💡开' : '🌑关'}]` : '') +
         (ball ? `  距离: ${dist(hero.row, hero.col, ball.row, ball.col)}` : '');
