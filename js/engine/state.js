@@ -59,14 +59,6 @@ function entityAt(r, c) {
   return crateAt(r, c);
 }
 
-function entityCount(r, c) {
-  let n = 0;
-  if (hero && hero.row === r && hero.col === c) n++;
-  if (ball && ball.row === r && ball.col === c) n++;
-  n += cratesAt(r, c).length;
-  return n;
-}
-
 function entityForPush(r, c, atHeight) {
   const key = K(r, c);
   const b = crates.get(key);

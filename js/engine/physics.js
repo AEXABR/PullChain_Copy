@@ -133,9 +133,10 @@ function updateLiftWalls() {
     }
     const tile = grid[wr][wc];
     const wantsActivated = allPressed;
-    // 只在墙即将变成 T_WALL（阻塞态）时检查 entityCount，防止碾压实体
     const wouldBeWall = (tile.liftWall === 'up') ? wantsActivated : !wantsActivated;
-    const canActivate = wantsActivated && !(wouldBeWall && entityCount(wr, wc) >= 2);
+    // 天花板机制：激活后格子顶部高度不能超过 CEILING
+    const wouldExceedCeiling = wouldBeWall && (topHeightAt(wr, wc) + 1) > CEILING;
+    const canActivate = wantsActivated && !wouldExceedCeiling;
     if (tile.liftWall === 'up') {
       tile.base = canActivate ? T_WALL : T_EMPTY;
     } else {
