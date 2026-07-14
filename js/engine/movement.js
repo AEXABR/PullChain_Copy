@@ -38,25 +38,34 @@ function diagCornersFor(dr, dc) {
   return null;
 }
 
-function followBall(prevRow, prevCol) {
-  if (!ball) return true;
-  if (dist(hero.row, hero.col, ball.row, ball.col) <= 1) return true;
-  if (grid[ball.row][ball.col].hasWeb) return false;
+// 泛化：所有带 LEASHED trait 的实体跟随 hero 移动
+// 替代原来的 followBall 特判
+function followLeashed(prevRow, prevCol) {
+  for (const ent of allEntities()) {
+    if (!ent.has(TRAITS.LEASHED)) continue;
+    if (!followOneLeashed(ent, prevRow, prevCol)) return false;
+  }
+  return true;
+}
 
-  const prevBallRow = ball.row, prevBallCol = ball.col;
-  const dr = Math.sign(prevRow - ball.row);
-  const dc = Math.sign(prevCol - ball.col);
+function followOneLeashed(leashedEnt, prevRow, prevCol) {
+  if (dist(hero.row, hero.col, leashedEnt.row, leashedEnt.col) <= 1) return true;
+  if (grid[leashedEnt.row][leashedEnt.col].hasWeb) return false;
+
+  const prevEntRow = leashedEnt.row, prevEntCol = leashedEnt.col;
+  const dr = Math.sign(prevRow - leashedEnt.row);
+  const dc = Math.sign(prevCol - leashedEnt.col);
   const candidates = [];
-  const diagRow = ball.row + dr;
-  const diagCol = ball.col + dc;
+  const diagRow = leashedEnt.row + dr;
+  const diagCol = leashedEnt.col + dc;
 
   let diagCorner = null;
   let diagOk = dr === 0 || dc === 0;
   if (!diagOk) {
-    const c1r = diagRow, c1c = ball.col;
-    const c2r = ball.row, c2c = diagCol;
-    const c1chain = getPushChain(c1r, c1c, dr, 0, ball.height);
-    const c2chain = getPushChain(c2r, c2c, 0, dc, ball.height);
+    const c1r = diagRow, c1c = leashedEnt.col;
+    const c2r = leashedEnt.row, c2c = diagCol;
+    const c1chain = getPushChain(c1r, c1c, dr, 0, leashedEnt.height);
+    const c2chain = getPushChain(c2r, c2c, 0, dc, leashedEnt.height);
     const needed = diagCornersFor(dr, dc);
     const c1clear = grid[c1r] && (!isSolid(c1r, c1c) || c1chain !== null
                                    || (needed && grid[c1r][c1c].diagCorner?.includes(needed[0])));
@@ -69,8 +78,8 @@ function followBall(prevRow, prevCol) {
   }
   if (diagOk) candidates.push({ row: diagRow, col: diagCol, pushDr: dr, pushDc: dc, corner: diagCorner });
   if (dr !== 0 && dc !== 0) {
-    candidates.push({ row: diagRow, col: ball.col, pushDr: dr, pushDc: 0 });
-    candidates.push({ row: ball.row, col: diagCol, pushDr: 0,  pushDc: dc });
+    candidates.push({ row: diagRow, col: leashedEnt.col, pushDr: dr, pushDc: 0 });
+    candidates.push({ row: leashedEnt.row, col: diagCol, pushDr: 0,  pushDc: dc });
   }
 
   const isValid = (c) =>
@@ -79,7 +88,7 @@ function followBall(prevRow, prevCol) {
 
   for (const c of candidates) {
     if (!isValid(c)) continue;
-    const chain = getPushChain(c.row, c.col, c.pushDr, c.pushDc, ball.height);
+    const chain = getPushChain(c.row, c.col, c.pushDr, c.pushDc, leashedEnt.height);
     if (chain === null) continue;
 
     const needsCorner = c.corner && (c.corner.c1chain || c.corner.c2chain);
@@ -90,29 +99,29 @@ function followBall(prevRow, prevCol) {
       if (c.corner.c2chain) pushChain(c.corner.c2chain, 0, dc);
     }
     if (needsPush) pushChain(chain, c.pushDr, c.pushDc);
-    ball.row = c.row; ball.col = c.col;
-    moveRiders(prevBallRow, prevBallCol, ball.row, ball.col, ball);
+    leashedEnt.row = c.row; leashedEnt.col = c.col;
+    moveRiders(prevEntRow, prevEntCol, leashedEnt.row, leashedEnt.col, leashedEnt);
     break;
   }
 
-  if (dist(hero.row, hero.col, ball.row, ball.col) > 1) {
+  if (dist(hero.row, hero.col, leashedEnt.row, leashedEnt.col) > 1) {
     for (const c of candidates) {
       if (!isValid(c)) continue;
-      const ent = entityForPush(c.row, c.col, ball.height);
-      const canStep = !ent || ball.height >= ent.height + ent.selfHeight;
+      const ent = entityForPush(c.row, c.col, leashedEnt.height);
+      const canStep = !ent || leashedEnt.height >= ent.height + ent.selfHeight;
       const targetFoot = grid[c.row][c.col].footLevel();
       const tile = grid[c.row][c.col];
-      const canAccess = ball.height >= targetFoot && !tile.isSolidAt(ball.height);
+      const canAccess = leashedEnt.height >= targetFoot && !tile.isSolidAt(leashedEnt.height);
       if (canStep && canAccess) {
-        ball.row = c.row; ball.col = c.col;
-        moveRiders(prevBallRow, prevBallCol, ball.row, ball.col, ball);
+        leashedEnt.row = c.row; leashedEnt.col = c.col;
+        moveRiders(prevEntRow, prevEntCol, leashedEnt.row, leashedEnt.col, leashedEnt);
         break;
       }
     }
   }
 
-  if (dist(hero.row, hero.col, ball.row, ball.col) > 1) {
-    ball.row = prevBallRow; ball.col = prevBallCol;
+  if (dist(hero.row, hero.col, leashedEnt.row, leashedEnt.col) > 1) {
+    leashedEnt.row = prevEntRow; leashedEnt.col = prevEntCol;
     return false;
   }
   return true;
@@ -134,9 +143,11 @@ function tryMoveHero(dr, dc) {
     const prevRow = hero.row, prevCol = hero.col;
     hero.row = nr; hero.col = nc;
     moveRiders(prevRow, prevCol, nr, nc, hero);
-    if (!followBall(prevRow, prevCol)) {
+    if (!followLeashed(prevRow, prevCol)) {
       hero.row = prevRow; hero.col = prevCol;
-      if (ball && ball.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ball.toggle();
+      for (const ent of allEntities()) {
+        if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
+      }
       return false;
     }
     return true;
@@ -147,9 +158,11 @@ function tryMoveHero(dr, dc) {
     const prevRow = hero.row, prevCol = hero.col;
     hero.row = nr; hero.col = nc;
     moveRiders(prevRow, prevCol, nr, nc, hero);
-    if (!followBall(prevRow, prevCol)) {
+    if (!followLeashed(prevRow, prevCol)) {
       hero.row = prevRow; hero.col = prevCol;
-      if (ball && ball.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ball.toggle();
+      for (const ent of allEntities()) {
+        if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
+      }
       return false;
     }
     return true;
@@ -178,11 +191,13 @@ function tryMoveHero(dr, dc) {
       moveRiders(nr, nc, topDestR, topDestC, topCrate);
       hero.row = nr; hero.col = nc;
       moveRiders(prevRow, prevCol, nr, nc, hero);
-      if (!followBall(prevRow, prevCol)) {
+      if (!followLeashed(prevRow, prevCol)) {
         restoreCrates(savedCrates);
         if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
         hero.row = savedHero.row; hero.col = savedHero.col;
-        if (ball && ball.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ball.toggle();
+        for (const ent of allEntities()) {
+          if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
+        }
         return false;
       }
       return true;
@@ -214,11 +229,13 @@ function tryMoveHero(dr, dc) {
   hero.row = nr; hero.col = nc;
   moveRiders(prevRow, prevCol, nr, nc, hero);
 
-  if (!followBall(prevRow, prevCol)) {
+  if (!followLeashed(prevRow, prevCol)) {
     restoreCrates(savedCrates);
     if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
     hero.row = savedHero.row; hero.col = savedHero.col;
-    if (ball && ball.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ball.toggle();
+    for (const ent of allEntities()) {
+      if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
+    }
     return false;
   }
   return true;

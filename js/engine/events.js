@@ -56,5 +56,5 @@ on('turnEnd', updateAllHeights);
 // 飞蛾飞行（内部会触发升降墙+高度同步）
 on('turnEnd', processFliers);
 
-// 飞蛾飞行后再次同步高度
-on('turnEnd', updateAllHeights);
+// 飞蛾飞行后再次同步高度（用箭头函数创建不同引用，避免 Set 去重）
+on('turnEnd', () => updateAllHeights());

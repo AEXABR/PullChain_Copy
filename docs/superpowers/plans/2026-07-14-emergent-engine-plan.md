@@ -322,11 +322,11 @@ on('turnEnd', updateAllHeights);
 // 飞蛾飞行（内部会触发升降墙+高度同步）
 on('turnEnd', processFliers);
 
-// 飞蛾飞行后再次同步高度
-on('turnEnd', updateAllHeights);
+// 飞蛾飞行后再次同步高度（用箭头函数创建不同引用，避免 Set 去重）
+on('turnEnd', () => updateAllHeights());
 ```
 
-注意：这里会注册两个 `updateAllHeights` handler（一个在 fliers 前，一个在 fliers 后）。这等价于原有行为，但会多执行一次。保持和原代码一致：原有也是 `updateAllHeights → processFliers → updateAllHeights`。不过仔细看，`processFliers` 内部已经调用了 `updateLiftWalls` 和 `updateAllHeights`（physics.js:208-209），所以原有的外部 `updateLiftWalls` + `updateAllHeights` 在 `processFliers` 之前是多余的？不不，`processFliers` 内部的更新只在"有飞蛾移动"时才触发。外部的更新是每回合都做的。所以保持两个 `updateAllHeights` 注册。
+注意：事件系统用 Set 存 listener，相同函数引用会被去重。直接用 `on('turnEnd', updateAllHeights)` 两次只会注册一次。第二次用箭头函数包装创建不同引用，确保 processFliers 前后各执行一次 updateAllHeights。
 
 等一下——原有主循环：
 ```
