@@ -135,6 +135,37 @@ function followOneLeashed(leashedEnt, prevRow, prevCol) {
   return true;
 }
 
+// --- 回滚辅助 ---
+
+// 绳子断裂时触发 toggle（如开关灯）
+function toggleLeashBreak() {
+  for (const ent of allEntities()) {
+    if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
+  }
+}
+
+// 事务性移动英雄：保存 → prepare → 移动 → followLeash → 失败回滚
+// savedState: { crates, ball } 由调用方传入（如无 crate 操作可为 null）
+// prepare: 在保存后、英雄移动前执行的特殊逻辑（如推箱子链）
+function tryMoveWithLeash(nr, nc, prevRow, prevCol, savedState, prepare) {
+  if (prepare) prepare();
+  hero.row = nr; hero.col = nc;
+  moveRiders(prevRow, prevCol, nr, nc, hero);
+  if (!followLeashed(prevRow, prevCol)) {
+    if (savedState) {
+      restoreCrates(savedState.crates);
+      if (ball && savedState.ball) {
+        ball.row = savedState.ball.row;
+        ball.col = savedState.ball.col;
+      }
+    }
+    hero.row = prevRow; hero.col = prevCol;
+    toggleLeashBreak();
+    return false;
+  }
+  return true;
+}
+
 // --- tryMoveHero 辅助函数 ---
 
 // 检查英雄能否进入目标格（边界、墙体、高差）
@@ -149,35 +180,15 @@ function canEnter(r, c) {
 function tryStepOnEntity(nr, nc, dr, dc) {
   const targetEnt = entityAt(nr, nc);
   if (!targetEnt || hero.height < targetEnt.height + targetEnt.selfHeight) return false;
-
   const prevRow = hero.row, prevCol = hero.col;
-  hero.row = nr; hero.col = nc;
-  moveRiders(prevRow, prevCol, nr, nc, hero);
-  if (!followLeashed(prevRow, prevCol)) {
-    hero.row = prevRow; hero.col = prevCol;
-    for (const ent of allEntities()) {
-      if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
-    }
-    return false;
-  }
-  return true;
+  return tryMoveWithLeash(nr, nc, prevRow, prevCol);
 }
 
 // 可通行的升降墙（墙升起但角色高度足够，无人阻挡）
 function tryPassableWall(nr, nc, dr, dc) {
   if (grid[nr][nc].base !== T_WALL || entityAt(nr, nc)) return false;
-
   const prevRow = hero.row, prevCol = hero.col;
-  hero.row = nr; hero.col = nc;
-  moveRiders(prevRow, prevCol, nr, nc, hero);
-  if (!followLeashed(prevRow, prevCol)) {
-    hero.row = prevRow; hero.col = prevCol;
-    for (const ent of allEntities()) {
-      if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
-    }
-    return false;
-  }
-  return true;
+  return tryMoveWithLeash(nr, nc, prevRow, prevCol);
 }
 
 // 双层箱子：只推动上层
@@ -192,31 +203,21 @@ function tryPushTopCrate(nr, nc, dr, dc) {
   if (topChain === null) return false;
 
   const savedCrates = snapshotCrates();
-  const savedHero = { row: hero.row, col: hero.col };
   const savedBall = ball ? { row: ball.row, col: ball.col } : null;
   const prevRow = hero.row, prevCol = hero.col;
-  if (topChain.length > 0) pushChain(topChain, dr, dc);
-  crates.delete(K(nr, nc) + ':1');
-  topCrate.row = topDestR; topCrate.col = topDestC;
-  const destKey = K(topDestR, topDestC);
-  if (crates.has(destKey)) {
-    crates.set(destKey + ':1', topCrate);
-  } else {
-    crates.set(destKey, topCrate);
-  }
-  moveRiders(nr, nc, topDestR, topDestC, topCrate);
-  hero.row = nr; hero.col = nc;
-  moveRiders(prevRow, prevCol, nr, nc, hero);
-  if (!followLeashed(prevRow, prevCol)) {
-    restoreCrates(savedCrates);
-    if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
-    hero.row = savedHero.row; hero.col = savedHero.col;
-    for (const ent of allEntities()) {
-      if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
+
+  return tryMoveWithLeash(nr, nc, prevRow, prevCol, { crates: savedCrates, ball: savedBall }, () => {
+    if (topChain.length > 0) pushChain(topChain, dr, dc);
+    crates.delete(K(nr, nc) + ':1');
+    topCrate.row = topDestR; topCrate.col = topDestC;
+    const destKey = K(topDestR, topDestC);
+    if (crates.has(destKey)) {
+      crates.set(destKey + ':1', topCrate);
+    } else {
+      crates.set(destKey, topCrate);
     }
-    return false;
-  }
-  return true;
+    moveRiders(nr, nc, topDestR, topDestC, topCrate);
+  });
 }
 
 // 策略链推动 + 跟随（兜底路径）
@@ -238,24 +239,12 @@ function tryPushAndMove(nr, nc, dr, dc) {
   }
 
   const savedCrates = snapshotCrates();
-  const savedHero = { row: hero.row, col: hero.col };
   const savedBall = ball ? { row: ball.row, col: ball.col } : null;
-
   const prevRow = hero.row, prevCol = hero.col;
-  pushChain(chain, dr, dc);
-  hero.row = nr; hero.col = nc;
-  moveRiders(prevRow, prevCol, nr, nc, hero);
 
-  if (!followLeashed(prevRow, prevCol)) {
-    restoreCrates(savedCrates);
-    if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
-    hero.row = savedHero.row; hero.col = savedHero.col;
-    for (const ent of allEntities()) {
-      if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
-    }
-    return false;
-  }
-  return true;
+  return tryMoveWithLeash(nr, nc, prevRow, prevCol, { crates: savedCrates, ball: savedBall }, () => {
+    pushChain(chain, dr, dc);
+  });
 }
 
 function tryMoveHero(dr, dc) {
