@@ -115,8 +115,8 @@ function placeLiftWall(row, col) {
     tile.base = T_WALL;
   }
   render();
-  const typeLabel = editor.currentLiftType === 'up' ? '上升型(默认下降)' : '下降型(默认升起)';
-  statusEl.textContent = `⇅ 升降墙已放置(${typeLabel})`;
+  const typeLabels = { up: '上升型(默认下降)', down: '下降型(默认升起)', auto: '🟣自动型(实体踩上升起)' };
+  statusEl.textContent = `⇅ 升降墙已放置(${typeLabels[editor.currentLiftType]})`;
 }
 
 function placeHighland(row, col) {

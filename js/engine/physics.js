@@ -124,23 +124,31 @@ function updateLiftWalls() {
   }
   for (const [wkey, plates] of wallPlates) {
     const [wr, wc] = wkey.split(',').map(Number);
-    let allPressed = plates.size > 0;
-    if (allPressed) {
-      for (const pk of plates) {
-        const [pr, pc] = pk.split(',').map(Number);
-        if (entityAt(pr, pc) === null) { allPressed = false; break; }
-      }
-    }
     const tile = grid[wr][wc];
-    const wantsActivated = allPressed;
-    const wouldBeWall = (tile.liftWall === 'up') ? wantsActivated : !wantsActivated;
+
+    let wantsActivated;
+    if (tile.liftWall === 'auto') {
+      // 自动升降墙：有实体移动到格子上就升起，实体离开则降下
+      wantsActivated = entityAt(wr, wc) !== null;
+    } else {
+      let allPressed = plates.size > 0;
+      if (allPressed) {
+        for (const pk of plates) {
+          const [pr, pc] = pk.split(',').map(Number);
+          if (entityAt(pr, pc) === null) { allPressed = false; break; }
+        }
+      }
+      wantsActivated = allPressed;
+    }
+
+    const wouldBeWall = (tile.liftWall === 'down') ? !wantsActivated : wantsActivated;
     // 天花板机制：激活后格子顶部高度不能超过 CEILING（天窗格豁免）
     const wouldExceedCeiling = wouldBeWall && !tile.hasSkylight && (topHeightAt(wr, wc) + 1) > CEILING;
     const canActivate = wantsActivated && !wouldExceedCeiling;
-    if (tile.liftWall === 'up') {
-      tile.base = canActivate ? T_WALL : T_EMPTY;
-    } else {
+    if (tile.liftWall === 'down') {
       tile.base = canActivate ? T_EMPTY : T_WALL;
+    } else {
+      tile.base = canActivate ? T_WALL : T_EMPTY;
     }
   }
 }

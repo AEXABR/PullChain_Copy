@@ -93,7 +93,7 @@ function setMode(newMode) {
   const dynLabels = {
     'diag':        `模式: 画斜角墙(${DIAG_SYMBOLS[editor.currentDiagCorner]}缺口) — 点击/拖拽画布放置`,
     'place_crate': `模式: 放置${CRATES[editor.currentCrateKey].name} — 点击空地放置`,
-    'liftwall':    `模式: 升降墙(${editor.currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`,
+    'liftwall':    `模式: 升降墙(${{up:'↑上升型',down:'↓下降型',auto:'🟣自动型'}[editor.currentLiftType]}) — 点击空地放置`,
   };
   statusEl.textContent = dynLabels[newMode] || modeLabels[newMode];
   render();
@@ -109,7 +109,8 @@ function updateDiagBtn() {
 }
 
 function updateLiftBtn() {
-  btnLiftwall.textContent = editor.currentLiftType === 'up' ? '⇅ 升墙(↑) [0]' : '⇅ 降墙(↓) [0]';
+  const labels = { up: '⇅ 升墙(↑) [6]', down: '⇅ 降墙(↓) [6]', auto: '🟣 自动墙(A) [6]' };
+  btnLiftwall.textContent = labels[editor.currentLiftType] || labels.up;
 }
 
 document.querySelectorAll('#toolbar button[data-mode]').forEach(b =>
@@ -130,9 +131,11 @@ document.querySelectorAll('#toolbar button[data-mode]').forEach(b =>
       return;
     }
     if (b.dataset.mode === 'liftwall' && editor.mode === 'liftwall') {
-      editor.currentLiftType = editor.currentLiftType === 'up' ? 'down' : 'up';
+      const cycle = { up: 'down', down: 'auto', auto: 'up' };
+      editor.currentLiftType = cycle[editor.currentLiftType];
       updateLiftBtn();
-      statusEl.textContent = `模式: 升降墙(${editor.currentLiftType === 'up' ? '↑上升型' : '↓下降型'}) — 点击空地放置`;
+      const typeLabel = { up: '↑上升型', down: '↓下降型', auto: '🟣自动型' }[editor.currentLiftType];
+      statusEl.textContent = `模式: 升降墙(${typeLabel}) — 点击空地放置`;
       return;
     }
     setMode(b.dataset.mode);

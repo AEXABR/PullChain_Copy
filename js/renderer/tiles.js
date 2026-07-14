@@ -197,7 +197,21 @@ function drawLiftWallTile(row, col, raised) {
   const type = grid[row][col].liftWall || 'up';
 
   if (raised) {
-    if (type === 'up') {
+    if (type === 'auto') {
+      ctx.fillStyle = '#6a4a8a';
+      ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      ctx.strokeStyle = '#9a7aba';
+      ctx.lineWidth = 1;
+      const third = TILE_SIZE / 3;
+      ctx.beginPath();
+      ctx.moveTo(x, y + third);
+      ctx.lineTo(x + TILE_SIZE, y + third);
+      ctx.moveTo(x, y + third * 2);
+      ctx.lineTo(x + TILE_SIZE, y + third * 2);
+      ctx.stroke();
+      ctx.strokeStyle = '#5a3a7a';
+      ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
+    } else if (type === 'up') {
       ctx.fillStyle = '#5566AA';
       ctx.fillRect(x, y, TILE_SIZE, TILE_SIZE);
       ctx.strokeStyle = '#7788BB';
@@ -227,7 +241,15 @@ function drawLiftWallTile(row, col, raised) {
       ctx.strokeRect(x + 0.5, y + 0.5, TILE_SIZE - 1, TILE_SIZE - 1);
     }
   } else {
-    if (type === 'up') {
+    if (type === 'auto') {
+      ctx.strokeStyle = '#9a7aba';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2, 2]);
+      ctx.strokeRect(x + 2, y + TILE_SIZE / 2, TILE_SIZE - 4, TILE_SIZE / 2 - 2);
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#6a4a8a';
+      ctx.fillRect(x, y + TILE_SIZE - 4, TILE_SIZE, 4);
+    } else if (type === 'up') {
       ctx.strokeStyle = '#7788BB';
       ctx.lineWidth = 1;
       ctx.setLineDash([2, 2]);
