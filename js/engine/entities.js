@@ -23,6 +23,10 @@ class Entity {
   moveTo(r, c) {
     this.row = r; this.col = c;
   }
+  // 飞行实体不自动落地（由 syncFlyingHeight 单独处理）
+  wantsGroundSnap() {
+    return !this.has(TRAITS.FLYING);
+  }
 }
 
 class Hero extends Entity {

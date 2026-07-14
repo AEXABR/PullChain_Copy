@@ -26,7 +26,7 @@ function tileFootLevel(r, c) {
 
 function updateEntityHeight(ent) {
   if (!ent) return;
-  if (ent.has(TRAITS.FLYING)) return; // 飞行实体不随地形落地
+  if (!ent.wantsGroundSnap()) return; // 飞行实体不随地形落地
   const r = ent.row, c = ent.col;
   const under = entityUnder(r, c, ent);
   if (under) {
@@ -125,7 +125,7 @@ function updateLiftWalls() {
     const wouldBeWall = (tile.liftWall === 'down') ? !wantsActivated : wantsActivated;
     // 天花板机制：只在墙真正升高（T_EMPTY→T_WALL）时检查，已升起的墙不重复算 +1
     const isRising = wouldBeWall && tile.base !== T_WALL;
-    const wouldExceedCeiling = isRising && !tile.hasSkylight && (topHeightAt(wr, wc) + 1) > CEILING;
+    const wouldExceedCeiling = isRising && (topHeightAt(wr, wc) + 1) > tile.ceilingHeight();
     const canActivate = wantsActivated && !wouldExceedCeiling;
     if (tile.liftWall === 'down') {
       tile.base = canActivate ? T_EMPTY : T_WALL;

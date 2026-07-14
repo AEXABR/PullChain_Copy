@@ -34,4 +34,8 @@ class Tile {
     if (this.hasWeb && !entity.has(TRAITS.FLYING)) fx.rooted = true;
     return fx;
   }
+  // 天窗格无高度上限，普通格为 CEILING(2)
+  ceilingHeight() {
+    return this.hasSkylight ? Infinity : CEILING;
+  }
 }
