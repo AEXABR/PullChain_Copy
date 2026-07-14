@@ -36,28 +36,9 @@ function updateEntityHeight(ent) {
   }
 }
 
-// 把任意实体从旧坐标移动到新坐标（统一处理 crate Map 和 hero/ball）
+// 把任意实体从旧坐标移动到新坐标（委托给 Entity/Crate 多态 moveTo）
 function moveEntityInMap(ent, newRow, newCol) {
-  if (ent.kind === 'crate') {
-    const oldKey = K(ent.row, ent.col);
-    const stackedKey = oldKey + ':1';
-    if (crates.get(oldKey) === ent) crates.delete(oldKey);
-    else if (crates.get(stackedKey) === ent) crates.delete(stackedKey);
-    ent.row = newRow; ent.col = newCol;
-    const newKey = K(newRow, newCol);
-    const existing = crates.get(newKey);
-    if (!existing) {
-      crates.set(newKey, ent);
-    } else if (ent.height < existing.height) {
-      crates.delete(newKey);
-      crates.set(newKey, ent);
-      crates.set(newKey + ':1', existing);
-    } else {
-      crates.set(newKey + ':1', ent);
-    }
-  } else {
-    ent.row = newRow; ent.col = newCol;
-  }
+  ent.moveTo(newRow, newCol);
 }
 
 // 目标格是否已有实体占据骑乘者的高度

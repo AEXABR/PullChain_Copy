@@ -20,6 +20,9 @@ class Entity {
     this.kind = 'entity';
   }
   has(trait) { return this.traits.has(trait); }
+  moveTo(r, c) {
+    this.row = r; this.col = c;
+  }
 }
 
 class Hero extends Entity {
@@ -58,6 +61,28 @@ class Crate extends Entity {
     }
     if (crateKey === 'snow') {
       this.traits.add(TRAITS.MELTS_IN_LIGHT);
+    }
+  }
+  moveTo(r, c) {
+    // 从旧位置移除
+    const oldKey = K(this.row, this.col);
+    const stackedKey = oldKey + ':1';
+    if (crates.get(oldKey) === this) crates.delete(oldKey);
+    else if (crates.get(stackedKey) === this) crates.delete(stackedKey);
+
+    this.row = r; this.col = c;
+
+    // 放入新位置，处理堆叠
+    const newKey = K(r, c);
+    const existing = crates.get(newKey);
+    if (!existing) {
+      crates.set(newKey, this);
+    } else if (this.height < existing.height) {
+      crates.delete(newKey);
+      crates.set(newKey, this);
+      crates.set(newKey + ':1', existing);
+    } else {
+      crates.set(newKey + ':1', this);
     }
   }
 }
