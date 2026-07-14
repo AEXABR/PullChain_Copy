@@ -38,4 +38,8 @@ class Tile {
   ceilingHeight() {
     return this.hasSkylight ? Infinity : CEILING;
   }
+
+  getWallBehavior() {
+    return this.liftWall ? WallBehaviors[this.liftWall] : null;
+  }
 }

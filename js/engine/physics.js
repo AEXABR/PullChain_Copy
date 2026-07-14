@@ -1,6 +1,38 @@
 // 提取自 js/engine.js
 // 重构：trait 替代 instanceof/crateKey，unified entitiesAt/allEntities 替代散落的 hero/ball/crates 检查
 
+// 升降墙行为策略 — 替代 updateLiftWalls 中的 liftWall 字符串 switch
+const WallBehaviors = {
+  up: {
+    wantsActivated(plates) {
+      if (plates.size === 0) return false;
+      for (const pk of plates) {
+        const [pr, pc] = pk.split(',').map(Number);
+        if (entityAt(pr, pc) === null) return false;
+      }
+      return true;
+    },
+    wallWhenActivated: true,
+  },
+  down: {
+    wantsActivated(plates) {
+      if (plates.size === 0) return false;
+      for (const pk of plates) {
+        const [pr, pc] = pk.split(',').map(Number);
+        if (entityAt(pr, pc) === null) return false;
+      }
+      return true;
+    },
+    wallWhenActivated: false,
+  },
+  auto: {
+    wantsActivated(plates, entitiesOnTile) {
+      return entitiesOnTile !== null;
+    },
+    wallWhenActivated: true,
+  },
+};
+
 function topHeightAt(row, col, exclude) {
   let top = grid[row][col].footLevel();
   for (const e of entitiesAt(row, col))
@@ -106,32 +138,21 @@ function updateLiftWalls() {
   for (const [wkey, plates] of wallPlates) {
     const [wr, wc] = wkey.split(',').map(Number);
     const tile = grid[wr][wc];
+    const behavior = tile.getWallBehavior();
 
-    let wantsActivated;
-    if (tile.liftWall === 'auto') {
-      // 自动升降墙：有实体移动到格子上就升起，实体离开则降下
-      wantsActivated = entityAt(wr, wc) !== null;
-    } else {
-      let allPressed = plates.size > 0;
-      if (allPressed) {
-        for (const pk of plates) {
-          const [pr, pc] = pk.split(',').map(Number);
-          if (entityAt(pr, pc) === null) { allPressed = false; break; }
-        }
-      }
-      wantsActivated = allPressed;
-    }
+    // 所有类型统一：behavior 自己决定激活条件
+    const wantsActivated = behavior.wantsActivated(plates, entityAt(wr, wc));
 
-    const wouldBeWall = (tile.liftWall === 'down') ? !wantsActivated : wantsActivated;
-    // 天花板机制：只在墙真正升高（T_EMPTY→T_WALL）时检查，已升起的墙不重复算 +1
+    const wouldBeWall = behavior.wallWhenActivated ? wantsActivated : !wantsActivated;
+
+    // 天花板机制：只在墙真正升高时检查
     const isRising = wouldBeWall && tile.base !== T_WALL;
     const wouldExceedCeiling = isRising && (topHeightAt(wr, wc) + 1) > tile.ceilingHeight();
     const canActivate = wantsActivated && !wouldExceedCeiling;
-    if (tile.liftWall === 'down') {
-      tile.base = canActivate ? T_EMPTY : T_WALL;
-    } else {
-      tile.base = canActivate ? T_WALL : T_EMPTY;
-    }
+
+    tile.base = canActivated
+      ? (behavior.wallWhenActivated ? T_WALL : T_EMPTY)
+      : (behavior.wallWhenActivated ? T_EMPTY : T_WALL);
   }
 }
 
