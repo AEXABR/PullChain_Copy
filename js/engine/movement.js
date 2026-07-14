@@ -86,6 +86,7 @@ function followOneLeashed(leashedEnt, prevRow, prevCol) {
     c.row >= 0 && c.row < GRID_SIZE && c.col >= 0 && c.col < GRID_SIZE &&
     dist(hero.row, hero.col, c.row, c.col) <= 1;
 
+  // 策略 1: 尝试推动路径
   for (const c of candidates) {
     if (!isValid(c)) continue;
     const chain = getPushChain(c.row, c.col, c.pushDr, c.pushDc, leashedEnt.height);
@@ -104,6 +105,7 @@ function followOneLeashed(leashedEnt, prevRow, prevCol) {
     break;
   }
 
+  // 策略 2: 不推只移（回退路径）
   if (dist(hero.row, hero.col, leashedEnt.row, leashedEnt.col) > 1) {
     for (const c of candidates) {
       if (!isValid(c)) continue;
@@ -204,28 +206,32 @@ function tryMoveHero(dr, dc) {
     }
   }
 
-  const chain = getPushChain(nr, nc, dr, dc, hero.height);
-  if (chain === null) return false;
+  // 策略链：依次尝试不同高度的推动
+  const pushStrategies = [hero.height];
+  // 骑乘高度：如果主角上方有骑乘实体，也尝试用骑乘者的高度
+  const heroTop = hero.height + hero.selfHeight;
+  const maxHeight = topHeightAt(hero.row, hero.col, hero);
+  for (let h = heroTop; h <= maxHeight; h++) {
+    pushStrategies.push(h);
+  }
 
-  // 通用化：人推不动时，尝试骑乘者的高度（不特判球）
-  if (chain.length === 0) {
-    const heroTop = hero.height + hero.selfHeight;
-    const maxHeight = topHeightAt(hero.row, hero.col, hero);
-    for (let h = heroTop; h <= maxHeight; h++) {
-      const altChain = getPushChain(nr, nc, dr, dc, h);
-      if (altChain !== null && altChain.length > 0) {
-        pushChain(altChain, dr, dc);
-        break;
-      }
+  let bestChain = null;
+  for (const pushH of pushStrategies) {
+    const chain = getPushChain(nr, nc, dr, dc, pushH);
+    if (chain !== null) {
+      bestChain = chain;
+      break;
     }
   }
+
+  if (bestChain === null) return false;
 
   const savedCrates = snapshotCrates();
   const savedHero = { row: hero.row, col: hero.col };
   const savedBall = ball ? { row: ball.row, col: ball.col } : null;
 
   const prevRow = hero.row, prevCol = hero.col;
-  pushChain(chain, dr, dc);
+  pushChain(bestChain, dr, dc);
   hero.row = nr; hero.col = nc;
   moveRiders(prevRow, prevCol, nr, nc, hero);
 
