@@ -160,6 +160,19 @@ function drawHighlandTile(row, col) {
   ctx.strokeRect(x + s, y + s, TILE_SIZE - s*2, TILE_SIZE - s*2);
 }
 
+function drawSkylightTile(row, col) {
+  const x = col * TILE_SIZE;
+  const y = row * TILE_SIZE;
+  // 最外圈轮廓，中间透明
+  ctx.strokeStyle = 'rgba(180, 200, 220, 0.7)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(x + 1, y + 1, TILE_SIZE - 2, TILE_SIZE - 2);
+  // 内圈细线装饰
+  ctx.strokeStyle = 'rgba(200, 220, 240, 0.4)';
+  ctx.lineWidth = 1;
+  ctx.strokeRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+}
+
 function drawPlateTile(row, col) {
   const x = col * TILE_SIZE;
   const y = row * TILE_SIZE;

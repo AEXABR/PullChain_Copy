@@ -84,6 +84,7 @@ function render() {
           drawHighlandTile(r, c);
         }
         if (tile.isPlate) drawPlateTile(r, c);
+        if (tile.hasSkylight) drawSkylightTile(r, c);
         if (tile.liftWall !== null) {
           drawLiftWallTile(r, c, false);
         } else if (tile.hasWeb) {

@@ -134,8 +134,8 @@ function updateLiftWalls() {
     const tile = grid[wr][wc];
     const wantsActivated = allPressed;
     const wouldBeWall = (tile.liftWall === 'up') ? wantsActivated : !wantsActivated;
-    // 天花板机制：激活后格子顶部高度不能超过 CEILING
-    const wouldExceedCeiling = wouldBeWall && (topHeightAt(wr, wc) + 1) > CEILING;
+    // 天花板机制：激活后格子顶部高度不能超过 CEILING（天窗格豁免）
+    const wouldExceedCeiling = wouldBeWall && !tile.hasSkylight && (topHeightAt(wr, wc) + 1) > CEILING;
     const canActivate = wantsActivated && !wouldExceedCeiling;
     if (tile.liftWall === 'up') {
       tile.base = canActivate ? T_WALL : T_EMPTY;

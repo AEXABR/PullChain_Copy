@@ -12,10 +12,11 @@ const btnPlate = document.getElementById('btn-plate');
 const btnLiftwall = document.getElementById('btn-liftwall');
 const btnWire = document.getElementById('btn-wire');
 const btnHighland = document.getElementById('btn-highland');
+const btnSkylight = document.getElementById('btn-skylight');
 const btnPlay = document.getElementById('btn-play');
 const btnExport = document.getElementById('btn-export');
 const btnClear = document.getElementById('btn-clear');
-const allBtns = [btnWall, btnDiag, btnErase, btnHero, btnBall, btnCrate, btnWeb, btnPlate, btnLiftwall, btnHighland, btnWire, btnPlay];
+const allBtns = [btnWall, btnDiag, btnErase, btnHero, btnBall, btnCrate, btnWeb, btnPlate, btnLiftwall, btnHighland, btnSkylight, btnWire, btnPlay];
 
 // 编辑器 UI 状态
 const editor = {
@@ -29,10 +30,10 @@ const editor = {
 };
 
 // 模式元数据
-const HOVER_MODES    = new Set(['place_hero','place_ball','place_crate','web','plate','liftwall','wire']);
-const HIGHLIGHT_MODES = new Set(['place_hero','place_ball','place_crate','web','plate','liftwall']);
-const BLOCKED_AS_WALL_MODES = new Set(['web','plate','liftwall']);
-const DRAG_MODES     = new Set(['wall','diag','erase','highland']);
+const HOVER_MODES    = new Set(['place_hero','place_ball','place_crate','web','plate','liftwall','skylight','wire']);
+const HIGHLIGHT_MODES = new Set(['place_hero','place_ball','place_crate','web','plate','liftwall','skylight']);
+const BLOCKED_AS_WALL_MODES = new Set(['web','plate','liftwall','skylight']);
+const DRAG_MODES     = new Set(['wall','diag','erase','highland','skylight']);
 
 // 模式标签
 const modeLabels = {
@@ -46,11 +47,12 @@ const modeLabels = {
   'plate':       '模式: 踏板 — 点击空地放置踏板',
   'liftwall':    '',
   'highland':  '模式: 高地 — 点击/拖拽在空地上放置高地（高度+1）',
+  'skylight':  '模式: 天窗 — 点击/拖拽在空地上放置天窗（取消高度上限）',
   'wire':        '模式: 引线 — 点击踏板然后点击升降墙连线',
   'play':        '模式: 操控 — 方向键/WASD 移动角色'
 };
 
 const activeBtns = {
   'wall': btnWall, 'diag': btnDiag, 'erase': btnErase,
-  'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'web': btnWeb, 'plate': btnPlate, 'liftwall': btnLiftwall, 'highland': btnHighland, 'wire': btnWire, 'play': btnPlay
+  'place_hero': btnHero, 'place_ball': btnBall, 'place_crate': btnCrate, 'web': btnWeb, 'plate': btnPlate, 'liftwall': btnLiftwall, 'highland': btnHighland, 'skylight': btnSkylight, 'wire': btnWire, 'play': btnPlay
 };

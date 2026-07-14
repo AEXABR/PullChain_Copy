@@ -9,6 +9,7 @@ class Tile {
     this.hasWater = false;      // 水渍
     this.hasWeb = false;        // 蜘蛛网
     this.hasHighland = false; // 高地（高度+1）
+    this.hasSkylight = false; // 天窗（取消高度上限）
   }
 
   // 实体在给定高度能否站在/穿过此格

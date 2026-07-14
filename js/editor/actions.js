@@ -23,6 +23,7 @@ function setTile(row, col, value) {
     tile.liftWall = null;
     tile.diagCorner = null;
     tile.hasHighland = false;
+    tile.hasSkylight = false;
     const key = K(row, col);
     for (let i = wireLinks.length - 1; i >= 0; i--) {
       if (wireLinks[i].plate === key || wireLinks[i].wall === key) {
@@ -134,6 +135,21 @@ function placeHighland(row, col) {
   statusEl.textContent = '⛰️ 高地已放置（高度+1）';
 }
 
+function placeSkylight(row, col) {
+  const tile = grid[row][col];
+  if (tile.base === T_WALL) {
+    statusEl.textContent = '⚠ 不能把天窗放在墙体上！';
+    return;
+  }
+  if (tile.hasSkylight) {
+    statusEl.textContent = '⚠ 此处已有天窗！';
+    return;
+  }
+  tile.hasSkylight = true;
+  render();
+  statusEl.textContent = '🔲 天窗已放置（取消高度上限）';
+}
+
 function eraseTop(row, col) {
   const key = K(row, col);
   const tile = grid[row][col];
@@ -209,6 +225,12 @@ function eraseTop(row, col) {
     render();
     return;
   }
+  if (tile.hasSkylight) {
+    tile.hasSkylight = false;
+    statusEl.textContent = '\u{1F5D1} 天窗已擦除';
+    render();
+    return;
+  }
   if (tile.hasWater) {
     tile.hasWater = false;
     statusEl.textContent = '\u{1F5D1} 水渍已擦除';
@@ -260,4 +282,5 @@ const PLACE_ACTIONS = {
   plate:       (r, c) => placePlate(r, c),
   liftwall:    (r, c) => placeLiftWall(r, c),
   highland:  (r, c) => placeHighland(r, c),
+  skylight:  (r, c) => placeSkylight(r, c),
 };

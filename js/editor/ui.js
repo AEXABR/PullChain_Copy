@@ -145,6 +145,7 @@ function exportMap() {
   const plateArr = [];
   const liftData = {};
   const highlandArr = [];
+  const skylightArr = [];
 
   for (let r = 0; r < GRID_SIZE; r++) {
     tiles[r] = [];
@@ -156,6 +157,7 @@ function exportMap() {
       if (tile.isPlate) plateArr.push(K(r, c));
       if (tile.liftWall !== null) liftData[K(r, c)] = tile.liftWall;
       if (tile.hasHighland) highlandArr.push(K(r, c));
+      if (tile.hasSkylight) skylightArr.push(K(r, c));
     }
   }
   for (const crate of crates.values()) {
@@ -172,6 +174,7 @@ function exportMap() {
     plateTiles: plateArr,
     liftWalls: liftData,
     highlandTiles: highlandArr,
+    skylightTiles: skylightArr,
     wireLinks: wireLinks
   };
 
@@ -214,7 +217,7 @@ const KEY_DIR = {
   'ArrowLeft':{dr:0,dc:-1},'a':{dr:0,dc:-1},'A':{dr:0,dc:-1},
   'ArrowRight':{dr:0,dc:1},'d':{dr:0,dc:1},'D':{dr:0,dc:1},
 };
-const KEY_MODE = { '1':'wall','2':'diag','3':'erase','4':'web','5':'plate','6':'liftwall','7':'highland','8':'place_hero','9':'place_ball','0':'place_crate','-':'wire' };
+const KEY_MODE = { '1':'wall','2':'diag','3':'erase','4':'web','5':'plate','6':'liftwall','7':'highland','8':'place_hero','9':'place_ball','0':'place_crate','-':'wire','=':'skylight' };
 
 document.addEventListener('keydown', (e) => {
   if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
