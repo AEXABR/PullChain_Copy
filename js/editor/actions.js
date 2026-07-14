@@ -264,6 +264,6 @@ const PLACE_ACTIONS = {
   web:         (r, c) => placeWeb(r, c),
   plate:       (r, c) => placePlate(r, c),
   liftwall:    (r, c) => placeLiftWall(r, c),
-  highland:  (r, c) => placeHighland(r, c),
-  skylight:  (r, c) => placeSkylight(r, c),
+  highland:    (r, c) => placeHighland(r, c),
+  skylight:    (r, c) => placeSkylight(r, c),
 };
