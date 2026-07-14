@@ -206,32 +206,29 @@ function tryMoveHero(dr, dc) {
     }
   }
 
-  // 策略链：依次尝试不同高度的推动
-  const pushStrategies = [hero.height];
-  // 骑乘高度：如果主角上方有骑乘实体，也尝试用骑乘者的高度
-  const heroTop = hero.height + hero.selfHeight;
-  const maxHeight = topHeightAt(hero.row, hero.col, hero);
-  for (let h = heroTop; h <= maxHeight; h++) {
-    pushStrategies.push(h);
-  }
+  // 主角必须能进入目标格（高度被阻挡则直接失败）
+  const chain = getPushChain(nr, nc, dr, dc, hero.height);
+  if (chain === null) return false;
 
-  let bestChain = null;
-  for (const pushH of pushStrategies) {
-    const chain = getPushChain(nr, nc, dr, dc, pushH);
-    if (chain !== null) {
-      bestChain = chain;
-      break;
+  // 策略链：主角高度无需推动时，尝试骑乘高度推动障碍物（副作用）
+  if (chain.length === 0) {
+    const heroTop = hero.height + hero.selfHeight;
+    const maxHeight = topHeightAt(hero.row, hero.col, hero);
+    for (let h = heroTop; h <= maxHeight; h++) {
+      const altChain = getPushChain(nr, nc, dr, dc, h);
+      if (altChain !== null && altChain.length > 0) {
+        pushChain(altChain, dr, dc);
+        break;
+      }
     }
   }
-
-  if (bestChain === null) return false;
 
   const savedCrates = snapshotCrates();
   const savedHero = { row: hero.row, col: hero.col };
   const savedBall = ball ? { row: ball.row, col: ball.col } : null;
 
   const prevRow = hero.row, prevCol = hero.col;
-  pushChain(bestChain, dr, dc);
+  pushChain(chain, dr, dc);
   hero.row = nr; hero.col = nc;
   moveRiders(prevRow, prevCol, nr, nc, hero);
 
