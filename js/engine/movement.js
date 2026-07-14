@@ -48,11 +48,8 @@ function followLeashed(prevRow, prevCol) {
   return true;
 }
 
-function followOneLeashed(leashedEnt, prevRow, prevCol) {
-  if (dist(hero.row, hero.col, leashedEnt.row, leashedEnt.col) <= 1) return true;
-  if (grid[leashedEnt.row][leashedEnt.col].hasWeb) return false;
-
-  const prevEntRow = leashedEnt.row, prevEntCol = leashedEnt.col;
+// 计算 leash 实体的候选移动方向（含斜角墙通过性检查）
+function buildCandidates(leashedEnt, prevRow, prevCol) {
   const dr = Math.sign(prevRow - leashedEnt.row);
   const dc = Math.sign(prevCol - leashedEnt.col);
   const candidates = [];
@@ -81,6 +78,15 @@ function followOneLeashed(leashedEnt, prevRow, prevCol) {
     candidates.push({ row: diagRow, col: leashedEnt.col, pushDr: dr, pushDc: 0 });
     candidates.push({ row: leashedEnt.row, col: diagCol, pushDr: 0,  pushDc: dc });
   }
+  return { candidates, dr, dc };
+}
+
+function followOneLeashed(leashedEnt, prevRow, prevCol) {
+  if (dist(hero.row, hero.col, leashedEnt.row, leashedEnt.col) <= 1) return true;
+  if (grid[leashedEnt.row][leashedEnt.col].hasWeb) return false;
+
+  const prevEntRow = leashedEnt.row, prevEntCol = leashedEnt.col;
+  const { candidates, dr, dc } = buildCandidates(leashedEnt, prevRow, prevCol);
 
   const isValid = (c) =>
     c.row >= 0 && c.row < GRID_SIZE && c.col >= 0 && c.col < GRID_SIZE &&
@@ -129,84 +135,92 @@ function followOneLeashed(leashedEnt, prevRow, prevCol) {
   return true;
 }
 
-function tryMoveHero(dr, dc) {
-  if (grid[hero.row][hero.col].effectsOn(hero).rooted) return false;
-  const nr = hero.row + dr, nc = hero.col + dc;
+// --- tryMoveHero 辅助函数 ---
 
-  if (nr < 0 || nr >= GRID_SIZE || nc < 0 || nc >= GRID_SIZE) return false;
-  const targetFoot = grid[nr][nc].footLevel();
-  const targetTile = grid[nr][nc];
-  if (targetTile.isSolidAt(hero.height)) return false;
+// 检查英雄能否进入目标格（边界、墙体、高差）
+function canEnter(r, c) {
+  if (r < 0 || r >= GRID_SIZE || c < 0 || c >= GRID_SIZE) return false;
+  if (grid[r][c].isSolidAt(hero.height)) return false;
+  if (hero.height < grid[r][c].footLevel()) return false;
+  return true;
+}
 
-  if (hero.height < targetFoot) return false;
-
+// 站到实体上面（攀爬）
+function tryStepOnEntity(nr, nc, dr, dc) {
   const targetEnt = entityAt(nr, nc);
-  if (targetEnt && hero.height >= targetEnt.height + targetEnt.selfHeight) {
-    const prevRow = hero.row, prevCol = hero.col;
-    hero.row = nr; hero.col = nc;
-    moveRiders(prevRow, prevCol, nr, nc, hero);
-    if (!followLeashed(prevRow, prevCol)) {
-      hero.row = prevRow; hero.col = prevCol;
-      for (const ent of allEntities()) {
-        if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
-      }
-      return false;
-    }
-    return true;
-  }
+  if (!targetEnt || hero.height < targetEnt.height + targetEnt.selfHeight) return false;
 
-  // 可通行的墙体（升降墙升起但角色高度足够），没有实体阻挡 → 直接站上去
-  if (targetTile.base === T_WALL && !targetEnt) {
-    const prevRow = hero.row, prevCol = hero.col;
-    hero.row = nr; hero.col = nc;
-    moveRiders(prevRow, prevCol, nr, nc, hero);
-    if (!followLeashed(prevRow, prevCol)) {
-      hero.row = prevRow; hero.col = prevCol;
-      for (const ent of allEntities()) {
-        if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
-      }
-      return false;
+  const prevRow = hero.row, prevCol = hero.col;
+  hero.row = nr; hero.col = nc;
+  moveRiders(prevRow, prevCol, nr, nc, hero);
+  if (!followLeashed(prevRow, prevCol)) {
+    hero.row = prevRow; hero.col = prevCol;
+    for (const ent of allEntities()) {
+      if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
     }
-    return true;
+    return false;
   }
+  return true;
+}
 
+// 可通行的升降墙（墙升起但角色高度足够，无人阻挡）
+function tryPassableWall(nr, nc, dr, dc) {
+  if (grid[nr][nc].base !== T_WALL || entityAt(nr, nc)) return false;
+
+  const prevRow = hero.row, prevCol = hero.col;
+  hero.row = nr; hero.col = nc;
+  moveRiders(prevRow, prevCol, nr, nc, hero);
+  if (!followLeashed(prevRow, prevCol)) {
+    hero.row = prevRow; hero.col = prevCol;
+    for (const ent of allEntities()) {
+      if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
+    }
+    return false;
+  }
+  return true;
+}
+
+// 双层箱子：只推动上层
+function tryPushTopCrate(nr, nc, dr, dc) {
   const bottomCrate = crates.get(K(nr, nc));
   const topCrate = crates.get(K(nr, nc) + ':1');
-  if (bottomCrate && topCrate && targetEnt === topCrate &&
-      hero.height >= bottomCrate.height + bottomCrate.selfHeight) {
-    const topDestR = nr + dr, topDestC = nc + dc;
-    const topChain = getPushChain(topDestR, topDestC, dr, dc, topCrate.height);
-    if (topChain !== null) {
-      const savedCrates = snapshotCrates();
-      const savedHero = { row: hero.row, col: hero.col };
-      const savedBall = ball ? { row: ball.row, col: ball.col } : null;
-      const prevRow = hero.row, prevCol = hero.col;
-      if (topChain.length > 0) pushChain(topChain, dr, dc);
-      crates.delete(K(nr, nc) + ':1');
-      topCrate.row = topDestR; topCrate.col = topDestC;
-      const destKey = K(topDestR, topDestC);
-      if (crates.has(destKey)) {
-        crates.set(destKey + ':1', topCrate);
-      } else {
-        crates.set(destKey, topCrate);
-      }
-      moveRiders(nr, nc, topDestR, topDestC, topCrate);
-      hero.row = nr; hero.col = nc;
-      moveRiders(prevRow, prevCol, nr, nc, hero);
-      if (!followLeashed(prevRow, prevCol)) {
-        restoreCrates(savedCrates);
-        if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
-        hero.row = savedHero.row; hero.col = savedHero.col;
-        for (const ent of allEntities()) {
-          if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
-        }
-        return false;
-      }
-      return true;
-    }
-  }
+  if (!bottomCrate || !topCrate || entityAt(nr, nc) !== topCrate) return false;
+  if (hero.height < bottomCrate.height + bottomCrate.selfHeight) return false;
 
-  // 主角必须能进入目标格（高度被阻挡则直接失败）
+  const topDestR = nr + dr, topDestC = nc + dc;
+  const topChain = getPushChain(topDestR, topDestC, dr, dc, topCrate.height);
+  if (topChain === null) return false;
+
+  const savedCrates = snapshotCrates();
+  const savedHero = { row: hero.row, col: hero.col };
+  const savedBall = ball ? { row: ball.row, col: ball.col } : null;
+  const prevRow = hero.row, prevCol = hero.col;
+  if (topChain.length > 0) pushChain(topChain, dr, dc);
+  crates.delete(K(nr, nc) + ':1');
+  topCrate.row = topDestR; topCrate.col = topDestC;
+  const destKey = K(topDestR, topDestC);
+  if (crates.has(destKey)) {
+    crates.set(destKey + ':1', topCrate);
+  } else {
+    crates.set(destKey, topCrate);
+  }
+  moveRiders(nr, nc, topDestR, topDestC, topCrate);
+  hero.row = nr; hero.col = nc;
+  moveRiders(prevRow, prevCol, nr, nc, hero);
+  if (!followLeashed(prevRow, prevCol)) {
+    restoreCrates(savedCrates);
+    if (ball) { ball.row = savedBall.row; ball.col = savedBall.col; }
+    hero.row = savedHero.row; hero.col = savedHero.col;
+    for (const ent of allEntities()) {
+      if (ent.has(TRAITS.LEASHED) && ent.has(TRAITS.TOGGLE_ON_LEASH_BREAK)) ent.toggle();
+    }
+    return false;
+  }
+  return true;
+}
+
+// 策略链推动 + 跟随（兜底路径）
+function tryPushAndMove(nr, nc, dr, dc) {
   const chain = getPushChain(nr, nc, dr, dc, hero.height);
   if (chain === null) return false;
 
@@ -242,4 +256,15 @@ function tryMoveHero(dr, dc) {
     return false;
   }
   return true;
+}
+
+function tryMoveHero(dr, dc) {
+  if (grid[hero.row][hero.col].effectsOn(hero).rooted) return false;
+  const nr = hero.row + dr, nc = hero.col + dc;
+  if (!canEnter(nr, nc)) return false;
+
+  if (tryStepOnEntity(nr, nc, dr, dc)) return true;
+  if (tryPassableWall(nr, nc, dr, dc)) return true;
+  if (tryPushTopCrate(nr, nc, dr, dc)) return true;
+  return tryPushAndMove(nr, nc, dr, dc);
 }
