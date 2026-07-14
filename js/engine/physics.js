@@ -142,8 +142,9 @@ function updateLiftWalls() {
     }
 
     const wouldBeWall = (tile.liftWall === 'down') ? !wantsActivated : wantsActivated;
-    // 天花板机制：激活后格子顶部高度不能超过 CEILING（天窗格豁免）
-    const wouldExceedCeiling = wouldBeWall && !tile.hasSkylight && (topHeightAt(wr, wc) + 1) > CEILING;
+    // 天花板机制：只在墙真正升高（T_EMPTY→T_WALL）时检查，已升起的墙不重复算 +1
+    const isRising = wouldBeWall && tile.base !== T_WALL;
+    const wouldExceedCeiling = isRising && !tile.hasSkylight && (topHeightAt(wr, wc) + 1) > CEILING;
     const canActivate = wantsActivated && !wouldExceedCeiling;
     if (tile.liftWall === 'down') {
       tile.base = canActivate ? T_EMPTY : T_WALL;
